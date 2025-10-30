@@ -3,7 +3,119 @@
         <title>Gaze Region Classification</title>
     </head>
     <body>
-        Hello, world!
+        <div class="divOuterContainer" id="divOuter">
+            <button id="btnCreateSession">Create Session</button>
+            <label id="lblCouldNotCreateSes">Could not create session!</label>
+
+            <div class="sessionMngtForm">
+                <input type="text" id="inpSessionToken" placeholder="6-digit session token"></input>
+                <button id="btnJoinSession">Join Session</button>
+                <label id="lblCouldNotJoinSes">Could not join session!</label>
+            </div>
+        </div>
+        <h1 id="lblCodeDisplay"></h1>
+        <h1 id="lblSessionReady">Session ready!</h1>
+
+        <script>
+            let ws
+            let code
+
+            document.getElementById('btnCreateSession').addEventListener('click', async() => {
+                // Create session.
+                const res  = await fetch('/api/create', { method: "POST" });
+                const data = await res.json();
+                if (data.status != "ok") {
+                    document.getElementById('lblCouldNotCreateSes').style.display = 'block';
+
+                    return;
+                }
+
+                code = data.code;
+                codeLbl = document.getElementById('lblCodeDisplay');
+                document.getElementById('divOuter').style.display = 'none';
+                codeLbl.style.display = 'block';
+                codeLbl.innerHTML     = `Code: ${code}`;
+
+                // Create websocket.
+                ws = new WebSocket(`ws://${location.host}/ws/${code}/upper`);
+                ws.onopen = () => {
+                    ws.send(JSON.stringify({"message": "hello from upper"}));
+                };
+                ws.onmessage = (event) => {
+                    json = JSON.parse(event.data)
+
+                    switch (json.type) {
+                        case "ready":
+                            document.getElementById('lblCodeDisplay').style.display = 'none';
+                            document.getElementById('lblSessionReady').style.display = 'block';
+
+                            break;
+                    }
+                };
+            });
+
+            document.getElementById('btnJoinSession').addEventListener('click', async() => {
+                // Get code.
+                code = document.getElementById('inpSessionToken').value;
+                // Join session.
+                const res  = await fetch(`/api/join?code=${code}`, { method: "POST" });
+                const data = await res.json();
+                if (data.status != "ok") {
+                    document.getElementById('lblCouldNotJoinSes').display = 'block';
+
+                    return;
+                }
+
+                // Update view.
+                document.getElementById('divOuter').style.display = 'none';
+
+                // Open websocket.
+                ws = new WebSocket(`ws://${location.host}/ws/${code}/lower`);
+                ws.onopen = () => {
+                    ws.send(JSON.stringify({"message": "hello from lower"}));
+                };
+            });
+        </script>
+        <style>
+            html, body {
+                height:           100%;
+                margin:           0;
+                font-family:      Arial, sans-serif;
+                display:          flex;
+                justify-content:  center;
+                align-items:      center;
+                background-color: rgb(11, 11, 11);
+            }
+
+            .divOuterContainer {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+                padding: 30px 40px;
+                border-radius: 10px;
+                border-width: 2px;
+                border-color: black;
+                margin: 3px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                background-color: rgb(33, 33 ,33);
+            }
+
+            #lblCouldNotCreateSes, #lblCouldNotJoinSes {
+                display: none;
+                color:   red;
+            }
+
+            #lblCodeDisplay {
+                display: none;
+                color: white;
+            }
+
+            #lblSessionReady {
+                display: none;
+                color: green;
+            }
+        </style>
     </body>
 </html>
 

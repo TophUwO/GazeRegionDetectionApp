@@ -1,7 +1,7 @@
-from app import gl_Application
+from app import app
 
 
 if __name__ == '__main__':
-    gl_Application.run(port=5000)
+    app.run(port=5000)
 
 
