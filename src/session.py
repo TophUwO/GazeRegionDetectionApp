@@ -3,13 +3,52 @@ import random
 from   dataclasses import dataclass
 
 
+GL_SESS_TAB: dict[int, dict] = {
+        0: { 'active': None },
+        1: { 'active': 'H' },
+        2: { 'active': 'H' },
+        3: { 'active': 'L' },
+        4: { 'active': None },
+        5: { 'active': 'H' }
+    }
+
 @dataclass
 class Session:
-    sessionCode: str = ''
-    upperTab:    any = None
-    lowerTab:    any = None
-    stage:       int = 0
+    sessionCode: str  = ''
+    upperTab:    any  = None
+    lowerTab:    any  = None
+    stage:       int  = 0
+    canSupply:   bool = False
 
+    async def sendActive(self, jsonObj: str) -> None:
+        # Get active.
+        activeId = GL_SESS_TAB.get(self.stage, None)
+        if activeId is None:
+            return
+        
+        # Determine tab.
+        tab = None
+        match activeId['active']:
+            case 'H': tab = self.upperTab
+            case 'L': tab = self.lowerTab
+
+        # Send.
+        await tab.send(jsonObj)
+
+    async def sendPassive(self, jsonObj: str) -> None:
+        # Get active.
+        activeId = GL_SESS_TAB.get(self.stage, None)
+        if activeId is None:
+            return
+        
+        # Determine tab.
+        tab = None
+        match activeId['active']:
+            case 'L': tab = self.upperTab
+            case 'H': tab = self.lowerTab
+
+        # Send.
+        await tab.send(jsonObj)
 
 class SessionManager:
     def __init__(self) -> None:

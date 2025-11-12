@@ -10,30 +10,77 @@ async def index():
     return await send_from_directory('static', 'index.html')
 
 
-@app.route('/api/create', methods=["POST"])
+@app.route('/api/create', methods=['POST'])
 async def createSession():
     sess: Session = sman.createSession()
 
     print(f'[SESS#{sess.sessionCode}] Opened session.')
 
     # Return session code.
-    return jsonify({"status": "ok", 'code': sess.sessionCode}), 200
+    return jsonify({'status': 'ok', 'code': sess.sessionCode}), 200
 
-@app.route('/api/join', methods=["POST"])
+@app.route('/api/join', methods=['POST'])
 async def joinSession():
     code = request.args.get('code', None)
     if code is None:
-        return jsonify({"status": "error", "error": "Invalid session token"}), 404
+        return jsonify({'status': 'error', 'error': 'Invalid session token'}), 404
     
     # Get session.
     sess: Session = sman.getSession(code)
     if sess is None:
-        return jsonify({"status": "error", "error": "Session not found."}), 404
+        return jsonify({'status': 'error', 'error': 'Session not found.'}), 404
     
     # Send to upper ready msg.
-    await sess.upperTab.send(json.dumps({"type": "ready"}))
+    await sess.upperTab.send(json.dumps({'type': 'ready'}))
     # All good.
-    return jsonify({"status": "ok"}), 200
+    return jsonify({'status': 'ok'}), 200
+
+@app.route('/api/start/<code>', methods=['POST'])
+async def startStage(code):
+    sess: Session = sman.getSession(code)
+    if sess is None:
+        return jsonify({'status': 'error', 'error': 'Session not found.'}), 404
+    
+    sess.stage += 1
+    sess.canSupply = True
+    await sess.sendActive(json.dumps({ 'type': 'showStage' }))
+    await sess.sendPassive(json.dumps({ 'type': 'showIdle' }))
+    return jsonify({'status': 'ok'}), 200
+    
+@app.route('/api/end/<code>', methods=['POST'])
+async def endStage(code):
+    sess: Session = sman.getSession(code)
+    if sess is None:
+        return jsonify({'status': 'error', 'error': 'Session not found.'}), 404
+    
+    sess.canSupply = False
+    sess.stage += 1
+    if sess.stage > 4:
+        await sess.sendActive(json.dumps({ 'type': 'showFini' }))
+        await sess.sendPassive(json.dumps({ 'type': 'showFini' }))
+
+        sess.stage -= 1
+        return jsonify({'status': 'ok'}), 200
+
+    await sess.sendActive(json.dumps({ 'type': 'showInst' }))
+    await sess.sendPassive(json.dumps({ 'type': 'showIdle' }))
+    sess.stage -= 1
+    return jsonify({'status': 'ok'}), 200
+
+@app.route('/api/submit/<code>', methods=['POST'])
+async def saveImage(code):
+    sess: Session = sman.getSession(code)
+    if sess is None:
+        return jsonify({'status': 'error', 'error': 'Session not found.'}), 404
+    elif not sess.canSupply:
+        return jsonify({'status': 'error', 'error': 'Cannot supply images at this stage.'}), 403
+    
+    # Get files.
+    for fname, img in (await request.files).items():
+        print(f'Got file \'{fname}\'.')
+
+    print('processed files')
+    return jsonify({'status': 'ok'}), 200
 
 
 @app.websocket('/ws/<code>/<role>')

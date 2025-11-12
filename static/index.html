@@ -3,38 +3,129 @@
         <title>Gaze Region Classification</title>
     </head>
     <body>
-        <div class="divOuterContainer" id="divOuter">
-            <button id="btnCreateSession">Create Session</button>
-            <label id="lblCouldNotCreateSes">Could not create session!</label>
+        <div class="page" id="pageWelcome">
+            <div class="divOuterContainer" id="divWelcome">
+                <button id="btnCreateSession">Create Session</button>
+                <label id="lblCouldNotCreateSes">Could not create session!</label>
 
-            <div class="sessionMngtForm">
-                <input type="text" id="inpSessionToken" placeholder="6-digit session token"></input>
-                <button id="btnJoinSession">Join Session</button>
-                <label id="lblCouldNotJoinSes">Could not join session!</label>
+                <div class="sessionMngtForm">
+                    <input type="text" id="inpSessionToken" placeholder="6-digit session token"></input>
+                    <button id="btnJoinSession">Join Session</button>
+                    <label id="lblCouldNotJoinSes">Could not join session!</label>
+                    <label id="lblEmptyToken">Must enter token before joining a session!</label>
+                </div>
             </div>
         </div>
-        <h1 id="lblCodeDisplay"></h1>
-        <h1 id="lblSessionReady">Session ready!</h1>
+        <div class="page" id="pageCodeDisplay">
+            <h1 id="lblCodeDisplay"></h1>
+        </div>
+        <div class="page" id="pageSessionReady">
+            <h1 id="lblSessionReady">Session ready!</h1>
+        </div>
+        <div class="page" id="pageIdle">
+            <h1>Screen is idle. Shit is happening on the other screen.</h1>
+        </div>
+        <div class="page" id="pageShowInst">
+            <h1>Instructions</h1>
+            Just don't do shit pls.
+
+            <button id="btnStart">Start</button>
+        </div>
+        <div class="page" id="pageStage1">
+            <h1>Stage 1</h1>
+        </div>
+        <div class="page" id="pageStage2">
+            <h1>Stage 2</h1>
+        </div>
+        <div class="page" id="pageStage3">
+            <h1>Stage 3</h1>
+        </div>
+        <div class="page" id="pageStage4">
+            <h1>Stage 4</h1>
+        </div>
+        <div class="page" id="pageFatalError">
+            <h1>A fatal error occurred. Please refresh the page and start anew.</h1>
+        </div>
+        <div class="page" id="pageFini">
+            <h1>Fini</h1>
+        </div>
 
         <script>
             let ws
             let code
+            let currPage = "pageWelcome"
+            let isInStage = false
+            let stageGraph = ['stage1', 'stage2', 'stage3', 'stage4', null]
+            let currStageIdx = 0
+            let currIval  = null
+
+            stages = {
+                'stage1': {'page': 'pageStage1', 'time': 5 * 1 },
+                'stage2': {'page': 'pageStage2', 'time': 5 * 1 },
+                'stage3': {'page': 'pageStage3', 'time': 5 * 1 },
+                'stage4': {'page': 'pageStage4', 'time': 10 * 1 }
+            };
+
+            function switchToPage(newPageId) {
+                if (currPage != null)
+                    document.getElementById(currPage).style.display = 'none';
+
+                currPage = newPageId;
+                if (newPageId != null)
+                    document.getElementById(currPage).style.display = 'block';
+            }
+
+            function showElement(elemId, isShown) {
+                elem = document.getElementById(elemId)
+
+                if (elem != null) {
+                    elem.style.display = isShown ? 'block' : 'none';
+                }
+            }
+
+            function getStageTime(stageIdx) {
+                if (currStageIdx > 3) {
+                    return 0;
+                }
+                name = stageGraph[stageIdx];
+
+                return stages[name].time
+            }
+
+            function getStagePage(stageIdx) {
+                if (currStageIdx > 3) {
+                    return 'pageFini';
+                }
+                name = stageGraph[stageIdx];
+
+                return stages[name].page
+            }
+
+            function updateAnimation() {
+                // do the bouncy ball
+
+                if (isInStage == true) {
+                    requestAnimationFrame(updateAnimation);
+                }
+            }
 
             document.getElementById('btnCreateSession').addEventListener('click', async() => {
                 // Create session.
                 const res  = await fetch('/api/create', { method: "POST" });
                 const data = await res.json();
                 if (data.status != "ok") {
-                    document.getElementById('lblCouldNotCreateSes').style.display = 'block';
+                    showElement('lblCouldNotCreateSes', true)
 
                     return;
                 }
 
-                code = data.code;
-                codeLbl = document.getElementById('lblCodeDisplay');
-                document.getElementById('divOuter').style.display = 'none';
-                codeLbl.style.display = 'block';
-                codeLbl.innerHTML     = `Code: ${code}`;
+                switchToPage('pageCodeDisplay')
+                {
+                    // Set code label.
+                    code              = data.code;
+                    codeLbl           = document.getElementById('lblCodeDisplay');
+                    codeLbl.innerHTML = `Code: ${code}`;
+                }
 
                 // Create websocket.
                 ws = new WebSocket(`ws://${location.host}/ws/${code}/upper`);
@@ -46,10 +137,25 @@
 
                     switch (json.type) {
                         case "ready":
-                            document.getElementById('lblCodeDisplay').style.display = 'none';
-                            document.getElementById('lblSessionReady').style.display = 'block';
+                            switchToPage('pageShowInst')
 
-                            break;
+                            break
+                        case 'fatal':
+                            switchToPage('pageFatalError')
+
+                            break
+                        case 'showStage':
+                            switchToPage(getStagePage(currStageIdx))
+                            
+                            break
+                        case 'showInst':
+                            switchToPage('pageShowInst')
+
+                            break
+                        case 'showFini':
+                            switchToPage('pageFini')
+
+                            break
                     }
                 };
             });
@@ -57,24 +163,91 @@
             document.getElementById('btnJoinSession').addEventListener('click', async() => {
                 // Get code.
                 code = document.getElementById('inpSessionToken').value;
+                if (code == null || code == "") {
+                    showElement('lblCouldNotJoinSes', false)
+                    showElement('lblEmptyToken', true)
+                }
+
                 // Join session.
-                const res  = await fetch(`/api/join?code=${code}`, { method: "POST" });
+                const res  = await fetch(`/api/join?code=${code}`, { method: 'POST' });
                 const data = await res.json();
                 if (data.status != "ok") {
-                    document.getElementById('lblCouldNotJoinSes').display = 'block';
+                    showElement('lblEmptyToken', false)
+                    showElement('lblCouldNotJoinSes', true)
 
                     return;
                 }
 
                 // Update view.
-                document.getElementById('divOuter').style.display = 'none';
+                //switchToPage('pageIdle')
 
                 // Open websocket.
                 ws = new WebSocket(`ws://${location.host}/ws/${code}/lower`);
                 ws.onopen = () => {
                     ws.send(JSON.stringify({"message": "hello from lower"}));
                 };
+                ws.onmessage = (event) => {
+                    json = JSON.parse(event.data)
+
+                    switch (json.type) {
+                        case 'fatal':
+                            switchToPage('pageFatalError')
+
+                            break
+                        case 'showStage':
+                            switchToPage(getStagePage(currStageIdx))
+
+                            break
+                        case 'showInst':
+                            switchToPage('pageShowInst')
+
+                            break
+                        case 'showFini':
+                            switchToPage('pageFini')
+
+                            break
+                    }
+                };
             });
+
+            document.getElementById('btnStart').addEventListener('click', async() => {
+                const res = await fetch(`/api/start/${code}`, { method: 'POST' });
+                const data = await res.json();
+
+                if (data.status != 'ok') {
+                    switchToPage('pageFatalError')
+
+                    return;
+                }
+                isInStage = true;
+
+                //switchToPage(getStagePage(currStageIdx))
+                currIval = setInterval(async() => {
+                    console.info('took photo')
+
+                    await fetch(`/api/submit/${code}`, { method: 'POST' });
+                }, (1.0/3.0)*1000.0)
+                setTimeout(async() => {
+                    clearInterval(currIval)
+                    isInStage = false
+                    ++currStageIdx;
+
+                    const r2 = await fetch(`/api/end/${code}`, { method: 'POST' });
+                    const d2 = await r2.json();
+
+                    if (data.status != 'ok') {
+                        switchToPage('pageFatalError')
+
+                        return;
+                    }
+                    //switchToPage(currStageIdx > 3 ? 'pageFini' : 'pageShowInst')
+                }, getStageTime(currStageIdx) * 1000);
+
+                // Start animation.
+                //updateAnimation();
+            });
+
+            switchToPage(currPage)
         </script>
         <style>
             html, body {
@@ -101,19 +274,23 @@
                 background-color: rgb(33, 33 ,33);
             }
 
-            #lblCouldNotCreateSes, #lblCouldNotJoinSes {
+            #lblCouldNotCreateSes, #lblCouldNotJoinSes, #lblEmptyToken {
                 display: none;
                 color:   red;
             }
 
             #lblCodeDisplay {
-                display: none;
+                display: block;
                 color: white;
             }
 
             #lblSessionReady {
-                display: none;
+                display: block;
                 color: green;
+            }
+
+            .page {
+                display: none;
             }
         </style>
     </body>
