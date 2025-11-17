@@ -66,17 +66,18 @@
             let stageId   = 0    // ID of the current stage
             let currPage  = null // currently-active page element
             let sessCode  = ''   // session code
+            let submIval  = null // submission interval object
 
             stages = {
                 'stage0': { 'H': 'pageWelcome',       'L': 'pageWelcome',       'time': 0       }, // prep, unused
                 'stage1': { 'H': 'pageShowInstInter', 'L': 'pageIdle',          'time': 0       }, // show inst 1
-                'stage2': { 'H': 'pageStage1',        'L': 'pageShowInst',      'time': 5 * 1  }, // coll 1
+                'stage2': { 'H': 'pageStage1',        'L': 'pageShowInst',      'time': 5 * 1   }, // coll 1
                 'stage3': { 'H': 'pageShowInstInter', 'L': 'pageIdle',          'time': 0       }, // show inst 2
-                'stage4': { 'H': 'pageStage2',        'L': 'pageShowInst',      'time': 5 * 1  }, // coll 2
+                'stage4': { 'H': 'pageStage2',        'L': 'pageShowInst',      'time': 5 * 1   }, // coll 2
                 'stage5': { 'H': 'pageIdle',          'L': 'pageShowInstInter', 'time': 0       }, // show inst 3
-                'stage6': { 'H': 'pageShowInst',      'L': 'pageStage3',        'time': 5 * 1  }, // coll 3
+                'stage6': { 'H': 'pageShowInst',      'L': 'pageStage3',        'time': 5 * 1   }, // coll 3
                 'stage7': { 'H': 'pageShowInstInter', 'L': 'pageIdle',          'time': 0       }, // show inst 4
-                'stage8': { 'H': 'pageShowInst',      'L': 'pageShowInst',      'time': 10 * 1 }, // coll 4
+                'stage8': { 'H': 'pageStage4',        'L': 'pageStage4',        'time': 10 * 1  }, // coll 4
                 'stage9': { 'H': 'pageFinished',      'L': 'pageFinished',      'time': 0       }  // fini
             };
 
@@ -121,12 +122,26 @@
                             // Switch page.
                             switchToPage(context[roleId])
 
-                            // If interactive, we start a timer for the upper tablet. When that timer runs out, we
-                            // advance.
+                            // If interactive, we set a timer for the session end and we also start the interval for the 
+                            // submission of the images.
                             if (context.time != 0) {
+                                // Set timeout timer.
                                 setTimeout(() => {
+                                    if (submIval != -1)
+                                        clearInterval(submIval)
+
                                     switchToPage('pageStageInterm')
                                 }, context.time * 1000)
+
+                                // Set submission interval, but only for the upper tablet.
+                                if (roleId == 'H')
+                                    submIval = setInterval(async() => {
+                                        console.log('took photo')
+
+                                        await fetch(`/api/submit/${sessCode}`, { method: 'POST' })
+                                    }, (1.0/3.0)*1000.0)
+                                else
+                                    submIval = -1
                             }
                         }
                         break
