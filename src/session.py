@@ -1,54 +1,80 @@
-import random
+from random      import *
+from dataclasses import dataclass, field
 
-from   dataclasses import dataclass
 
+@dataclass
+class Pair:
+    upper: any = None
+    lower: any = None
 
-GL_SESS_TAB: dict[int, dict] = {
-        0: { 'active': None },
-        1: { 'active': 'H' },
-        2: { 'active': 'H' },
-        3: { 'active': 'L' },
-        4: { 'active': None },
-        5: { 'active': 'H' }
-    }
+@dataclass
+class Stage:
+    activeId:  str  = None
+    canSupply: bool = False
+    isFinal:   bool = False
 
 @dataclass
 class Session:
-    sessionCode: str  = ''
-    upperTab:    any  = None
-    lowerTab:    any  = None
-    stage:       int  = 0
-    canSupply:   bool = False
+    sessionCode: str   = ''
+    tabs:        Pair  = field(default_factory=lambda: Pair(None, None))
+    stageId:     int   = 0
+    stage:       Stage = field(default_factory=lambda: Stage(None, False, False))
 
-    async def sendActive(self, jsonObj: str) -> None:
-        # Get active.
-        activeId = GL_SESS_TAB.get(self.stage, None)
-        if activeId is None:
+    def advanceStage(self) -> None:
+        GL_SESSTAB: dict[int, Stage] = {
+            0: Stage(None, False, False),
+            1: Stage(None, False, False),
+            2: Stage('H',  True,  False),
+            3: Stage('H',  False, False),
+            4: Stage('H',  True,  False),
+            5: Stage('L',  False, False),
+            6: Stage('L',  True,  False),
+            7: Stage('H',  False, False),
+            8: Stage('H',  True,  False),
+            9: Stage(None, False, True)
+        }
+
+        self.stageId += 1
+        try:
+            self.stage = GL_SESSTAB[self.stageId]
+        except KeyError:
+            self.stageId = 9
+            self.stage   = Stage(None, False, True)
+
+            pass
+        
+    def registerAsRole(self, role: str, ws: any) -> None:
+        if role not in ['H', 'L']:
+            print(f'error: Unknown role \'{role}\'.')
+
             return
         
-        # Determine tab.
-        tab = None
-        match activeId['active']:
-            case 'H': tab = self.upperTab
-            case 'L': tab = self.lowerTab
+        # Register tablet.
+        match role:
+            case 'H': self.tabs.upper = ws
+            case 'L': self.tabs.lower = ws
 
-        # Send.
-        await tab.send(jsonObj)
+    async def sendRole(self, roleId: str, cmd: str, value: any) -> None:
+        # Format message.
+        msg: str = f'''
+            {{
+                "command": "{cmd}",
+                "value":   "{value}"
+            }}
+        '''
 
-    async def sendPassive(self, jsonObj: str) -> None:
-        # Get active.
-        activeId = GL_SESS_TAB.get(self.stage, None)
-        if activeId is None:
+        # If role is 'any', do a broadcast.
+        if roleId == 'any':     
+            await self.tabs.upper.send(msg)
+            await self.tabs.lower.send(msg)
+
             return
         
-        # Determine tab.
-        tab = None
-        match activeId['active']:
-            case 'L': tab = self.upperTab
-            case 'H': tab = self.lowerTab
+        tab: any = self.tabs.upper if roleId == 'H' else self.tabs.lower if roleId == 'L' else None
+        if tab is None:
+            print(f'error: Invalid role ID \'{roleId}\'.')
+        await tab.send(msg)
 
-        # Send.
-        await tab.send(jsonObj)
 
 class SessionManager:
     def __init__(self) -> None:
@@ -56,11 +82,11 @@ class SessionManager:
 
     def createSession(self) -> Session:
         def int_GenSessCode() -> str:
-            return ''.join(random.choices('abcdef0123456789', k=6))
+            return ''.join(choices('abcdef0123456789', k=6))
         
         # Create the new session.
         while True:
-            sess: Session = Session(sessionCode=int_GenSessCode(), upperTab=None, lowerTab=None)
+            sess: Session = Session(sessionCode=int_GenSessCode())
 
             # Add session.
             if sess.sessionCode in self.sessionDict:

@@ -6,13 +6,10 @@
         <div class="page" id="pageWelcome">
             <div class="divOuterContainer" id="divWelcome">
                 <button id="btnCreateSession">Create Session</button>
-                <label id="lblCouldNotCreateSes">Could not create session!</label>
 
                 <div class="sessionMngtForm">
                     <input type="text" id="inpSessionToken" placeholder="6-digit session token"></input>
                     <button id="btnJoinSession">Join Session</button>
-                    <label id="lblCouldNotJoinSes">Could not join session!</label>
-                    <label id="lblEmptyToken">Must enter token before joining a session!</label>
                 </div>
             </div>
         </div>
@@ -20,16 +17,29 @@
             <h1 id="lblCodeDisplay"></h1>
         </div>
         <div class="page" id="pageSessionReady">
-            <h1 id="lblSessionReady">Session ready!</h1>
+            <h1 id="lblSessionReady">Session ready. Press 'Start' to start data collection.</h1>
+
+            <button id="btnStartAll">Start</button>
+        </div>
+        <div class="page" id="pageStageInterm">
+            <h1 id="lblSessionInterm">Stage completed. Press 'Continue' to advance to the next stage.</h1>
+
+            <button id="btnContinue">Continue</button>
         </div>
         <div class="page" id="pageIdle">
             <h1>Screen is idle. Shit is happening on the other screen.</h1>
         </div>
-        <div class="page" id="pageShowInst">
+        <div class="page" id="pageShowInstInter">
             <h1>Instructions</h1>
-            Just don't do shit pls.
+            Instructions.<br>
+            Press 'Start' to start data collection.
 
             <button id="btnStart">Start</button>
+        </div>
+        <div class="page" id="pageShowInst">
+            <h1>Instructions</h1>
+            Instructions<br>
+            Do the stuff.
         </div>
         <div class="page" id="pageStage1">
             <h1>Stage 1</h1>
@@ -46,208 +56,139 @@
         <div class="page" id="pageFatalError">
             <h1>A fatal error occurred. Please refresh the page and start anew.</h1>
         </div>
-        <div class="page" id="pageFini">
+        <div class="page" id="pageFinished">
             <h1>Fini</h1>
         </div>
 
         <script>
-            let ws
-            let code
-            let currPage = "pageWelcome"
-            let isInStage = false
-            let stageGraph = ['stage1', 'stage2', 'stage3', 'stage4', null]
-            let currStageIdx = 0
-            let currIval  = null
+            let webSocket = null // websocket for comms
+            let roleId    = ''   // ID of this client's role
+            let stageId   = 0    // ID of the current stage
+            let currPage  = null // currently-active page element
+            let sessCode  = ''   // session code
 
             stages = {
-                'stage1': {'page': 'pageStage1', 'time': 5 * 1 },
-                'stage2': {'page': 'pageStage2', 'time': 5 * 1 },
-                'stage3': {'page': 'pageStage3', 'time': 5 * 1 },
-                'stage4': {'page': 'pageStage4', 'time': 10 * 1 }
+                'stage0': { 'H': 'pageWelcome',       'L': 'pageWelcome',       'time': 0       }, // prep, unused
+                'stage1': { 'H': 'pageShowInstInter', 'L': 'pageIdle',          'time': 0       }, // show inst 1
+                'stage2': { 'H': 'pageStage1',        'L': 'pageShowInst',      'time': 5 * 1  }, // coll 1
+                'stage3': { 'H': 'pageShowInstInter', 'L': 'pageIdle',          'time': 0       }, // show inst 2
+                'stage4': { 'H': 'pageStage2',        'L': 'pageShowInst',      'time': 5 * 1  }, // coll 2
+                'stage5': { 'H': 'pageIdle',          'L': 'pageShowInstInter', 'time': 0       }, // show inst 3
+                'stage6': { 'H': 'pageShowInst',      'L': 'pageStage3',        'time': 5 * 1  }, // coll 3
+                'stage7': { 'H': 'pageShowInstInter', 'L': 'pageIdle',          'time': 0       }, // show inst 4
+                'stage8': { 'H': 'pageShowInst',      'L': 'pageShowInst',      'time': 10 * 1 }, // coll 4
+                'stage9': { 'H': 'pageFinished',      'L': 'pageFinished',      'time': 0       }  // fini
             };
 
-            function switchToPage(newPageId) {
-                if (currPage != null)
-                    document.getElementById(currPage).style.display = 'none';
+            function switchToPage(pageName) {
+                // Hide the current page.
+                if (currPage != null) {
+                    currPage.style.display = 'none'
+                }
 
-                currPage = newPageId;
-                if (newPageId != null)
-                    document.getElementById(currPage).style.display = 'block';
+                // Show the next page.
+                currPage = document.getElementById(pageName)
+                if (currPage == null) {
+                    currPage = document.getElementById('pageFatalError')
+                }
+                currPage.style.display = 'block'
             }
 
-            function showElement(elemId, isShown) {
-                elem = document.getElementById(elemId)
-
-                if (elem != null) {
-                    elem.style.display = isShown ? 'block' : 'none';
+            function setupWebsocket() {
+                // Open websocket.
+                webSocket = new WebSocket(`ws://${location.host}/ws/${sessCode}/${roleId}`)
+                {
+                    webSocket.onopen    = wsOnOpen
+                    webSocket.onmessage = wsOnMessage
                 }
             }
 
-            function getStageTime(stageIdx) {
-                if (currStageIdx > 3) {
-                    return 0;
-                }
-                name = stageGraph[stageIdx];
-
-                return stages[name].time
+            function wsOnOpen() {
+                webSocket.send(JSON.stringify({ 'message': `hello from role ${roleId}` }))
             }
 
-            function getStagePage(stageIdx) {
-                if (currStageIdx > 3) {
-                    return 'pageFini';
-                }
-                name = stageGraph[stageIdx];
+            function wsOnMessage(event) {
+                response = JSON.parse(event.data)
 
-                return stages[name].page
-            }
+                switch (response.command) {
+                    case 'ready':
+                        switchToPage('pageSessionReady')
 
-            function updateAnimation() {
-                // do the bouncy ball
+                        break
+                    case 'start_stage':
+                        context = stages[`stage${response.value}`]
+                        {
+                            // Switch page.
+                            switchToPage(context[roleId])
 
-                if (isInStage == true) {
-                    requestAnimationFrame(updateAnimation);
+                            // If interactive, we start a timer for the upper tablet. When that timer runs out, we
+                            // advance.
+                            if (context.time != 0) {
+                                setTimeout(() => {
+                                    switchToPage('pageStageInterm')
+                                }, context.time * 1000)
+                            }
+                        }
+                        break
                 }
             }
 
             document.getElementById('btnCreateSession').addEventListener('click', async() => {
-                // Create session.
-                const res  = await fetch('/api/create', { method: "POST" });
-                const data = await res.json();
-                if (data.status != "ok") {
-                    showElement('lblCouldNotCreateSes', true)
+                // Create new session.
+                const response = await fetch('/api/create', { method: 'POST' })
+                const data     = await response.json()
+                
+                if (data.type == 'ok') {
+                    // Set state.
+                    switchToPage('pageCodeDisplay')
+                    {
+                        roleId   = 'H'
+                        sessCode = data.payload.code
 
-                    return;
-                }
-
-                switchToPage('pageCodeDisplay')
-                {
-                    // Set code label.
-                    code              = data.code;
-                    codeLbl           = document.getElementById('lblCodeDisplay');
-                    codeLbl.innerHTML = `Code: ${code}`;
-                }
-
-                // Create websocket.
-                ws = new WebSocket(`ws://${location.host}/ws/${code}/upper`);
-                ws.onopen = () => {
-                    ws.send(JSON.stringify({"message": "hello from upper"}));
-                };
-                ws.onmessage = (event) => {
-                    json = JSON.parse(event.data)
-
-                    switch (json.type) {
-                        case "ready":
-                            switchToPage('pageShowInst')
-
-                            break
-                        case 'fatal':
-                            switchToPage('pageFatalError')
-
-                            break
-                        case 'showStage':
-                            switchToPage(getStagePage(currStageIdx))
-                            
-                            break
-                        case 'showInst':
-                            switchToPage('pageShowInst')
-
-                            break
-                        case 'showFini':
-                            switchToPage('pageFini')
-
-                            break
+                        // Show code.
+                        document.getElementById('lblCodeDisplay').innerHTML = `Code: ${sessCode}`
                     }
-                };
-            });
+
+                    // Open websocket.
+                    setupWebsocket()
+                }
+            })
 
             document.getElementById('btnJoinSession').addEventListener('click', async() => {
-                // Get code.
-                code = document.getElementById('inpSessionToken').value;
-                if (code == null || code == "") {
-                    showElement('lblCouldNotJoinSes', false)
-                    showElement('lblEmptyToken', true)
-                }
+                // Get token from form.
+                sessCode = document.getElementById('inpSessionToken').value
+                
+                if (sessCode != null && sessCode != '') {
+                    const response = await fetch(`/api/join?code=${sessCode}`, { method: 'POST' })
+                    const data     = await response.json()
 
-                // Join session.
-                const res  = await fetch(`/api/join?code=${code}`, { method: 'POST' });
-                const data = await res.json();
-                if (data.status != "ok") {
-                    showElement('lblEmptyToken', false)
-                    showElement('lblCouldNotJoinSes', true)
+                    if (data.type == 'ok') {
+                        // Set state.
+                        switchToPage('pageIdle')
+                        {
+                            roleId = 'L'
+                        }
 
-                    return;
-                }
-
-                // Update view.
-                //switchToPage('pageIdle')
-
-                // Open websocket.
-                ws = new WebSocket(`ws://${location.host}/ws/${code}/lower`);
-                ws.onopen = () => {
-                    ws.send(JSON.stringify({"message": "hello from lower"}));
-                };
-                ws.onmessage = (event) => {
-                    json = JSON.parse(event.data)
-
-                    switch (json.type) {
-                        case 'fatal':
-                            switchToPage('pageFatalError')
-
-                            break
-                        case 'showStage':
-                            switchToPage(getStagePage(currStageIdx))
-
-                            break
-                        case 'showInst':
-                            switchToPage('pageShowInst')
-
-                            break
-                        case 'showFini':
-                            switchToPage('pageFini')
-
-                            break
+                        // Open websocket.
+                        setupWebsocket()
                     }
-                };
-            });
+                }
+            })
+
+            document.getElementById('btnStartAll').addEventListener('click', async() => {
+                await fetch(`api/advance/${sessCode}`, { method: 'POST' })
+            })
 
             document.getElementById('btnStart').addEventListener('click', async() => {
-                const res = await fetch(`/api/start/${code}`, { method: 'POST' });
-                const data = await res.json();
+                await fetch(`api/advance/${sessCode}`, { method: 'POST' })
+            })
 
-                if (data.status != 'ok') {
-                    switchToPage('pageFatalError')
+            document.getElementById('btnContinue').addEventListener('click', async() => {
+                await fetch(`api/advance/${sessCode}`, { method: 'POST' })
+            })
 
-                    return;
-                }
-                isInStage = true;
-
-                //switchToPage(getStagePage(currStageIdx))
-                currIval = setInterval(async() => {
-                    console.info('took photo')
-
-                    await fetch(`/api/submit/${code}`, { method: 'POST' });
-                }, (1.0/3.0)*1000.0)
-                setTimeout(async() => {
-                    clearInterval(currIval)
-                    isInStage = false
-                    ++currStageIdx;
-
-                    const r2 = await fetch(`/api/end/${code}`, { method: 'POST' });
-                    const d2 = await r2.json();
-
-                    if (data.status != 'ok') {
-                        switchToPage('pageFatalError')
-
-                        return;
-                    }
-                    //switchToPage(currStageIdx > 3 ? 'pageFini' : 'pageShowInst')
-                }, getStageTime(currStageIdx) * 1000);
-
-                // Start animation.
-                //updateAnimation();
-            });
-
-            switchToPage(currPage)
+            // Switch to welcome page so that we can do stuff.
+            switchToPage('pageWelcome')
         </script>
         <style>
             html, body {

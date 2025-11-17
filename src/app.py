@@ -1,14 +1,16 @@
-from quart   import *
+from quart   import Quart, send_from_directory, request, websocket
 from session import *
+from error   import *
+from json    import *
 
 
 app:  Quart          = Quart(__name__)
 sman: SessionManager = SessionManager()
 
+
 @app.route('/')
 async def index():
     return await send_from_directory('static', 'index.html')
-
 
 @app.route('/api/create', methods=['POST'])
 async def createSession():
@@ -17,84 +19,61 @@ async def createSession():
     print(f'[SESS#{sess.sessionCode}] Opened session.')
 
     # Return session code.
-    return jsonify({'status': 'ok', 'code': sess.sessionCode}), 200
+    return FormatResponse(ResponseStatus.Ok, { 'code': sess.sessionCode })
 
 @app.route('/api/join', methods=['POST'])
 async def joinSession():
     code = request.args.get('code', None)
     if code is None:
-        return jsonify({'status': 'error', 'error': 'Invalid session token'}), 404
+        return FormatResponse(ResponseStatus.InvalidSessionToken)
     
     # Get session.
     sess: Session = sman.getSession(code)
     if sess is None:
-        return jsonify({'status': 'error', 'error': 'Session not found.'}), 404
+        return FormatResponse(ResponseStatus.SessionNotFound)
     
-    # Send to upper ready msg.
-    await sess.upperTab.send(json.dumps({'type': 'ready'}))
     # All good.
-    return jsonify({'status': 'ok'}), 200
+    await sess.sendRole('H', 'ready', '')
+    return FormatResponse(ResponseStatus.Ok)
 
-@app.route('/api/start/<code>', methods=['POST'])
-async def startStage(code):
+@app.route('/api/advance/<code>', methods=['POST'])
+async def advanceStage(code):
     sess: Session = sman.getSession(code)
     if sess is None:
-        return jsonify({'status': 'error', 'error': 'Session not found.'}), 404
+        return FormatResponse(ResponseStatus.SessionNotFound)
     
-    sess.stage += 1
-    sess.canSupply = True
-    await sess.sendActive(json.dumps({ 'type': 'showStage' }))
-    await sess.sendPassive(json.dumps({ 'type': 'showIdle' }))
-    return jsonify({'status': 'ok'}), 200
-    
-@app.route('/api/end/<code>', methods=['POST'])
-async def endStage(code):
-    sess: Session = sman.getSession(code)
-    if sess is None:
-        return jsonify({'status': 'error', 'error': 'Session not found.'}), 404
-    
-    sess.canSupply = False
-    sess.stage += 1
-    if sess.stage > 4:
-        await sess.sendActive(json.dumps({ 'type': 'showFini' }))
-        await sess.sendPassive(json.dumps({ 'type': 'showFini' }))
-
-        sess.stage -= 1
-        return jsonify({'status': 'ok'}), 200
-
-    await sess.sendActive(json.dumps({ 'type': 'showInst' }))
-    await sess.sendPassive(json.dumps({ 'type': 'showIdle' }))
-    sess.stage -= 1
-    return jsonify({'status': 'ok'}), 200
+    sess.advanceStage()
+    await sess.sendRole('any', 'start_stage', sess.stageId)
+    return FormatResponse(ResponseStatus.Ok)
 
 @app.route('/api/submit/<code>', methods=['POST'])
 async def saveImage(code):
     sess: Session = sman.getSession(code)
     if sess is None:
-        return jsonify({'status': 'error', 'error': 'Session not found.'}), 404
-    elif not sess.canSupply:
-        return jsonify({'status': 'error', 'error': 'Cannot supply images at this stage.'}), 403
+        return FormatResponse(ResponseStatus.SessionNotFound)
+    elif not sess.stage.canSupply:
+        return FormatResponse(ResponseStatus.CannotSupplyImages)
     
     # Get files.
     for fname, img in (await request.files).items():
         print(f'Got file \'{fname}\'.')
 
     print('processed files')
-    return jsonify({'status': 'ok'}), 200
+    return FormatResponse(ResponseStatus.Ok)
 
 
 @app.websocket('/ws/<code>/<role>')
 async def handleWebsocket(code, role):
     # Get session.
     sess: Session = sman.getSession(code)
-    if sess is None or role not in ['upper', 'lower']:
+    if sess is None or role not in ['H', 'L']:
         await websocket.close()
 
     # Set the websocket connection.
     ws = websocket._get_current_object()
     match role:
-        case 'upper': sess.upperTab = ws
-        case 'lower': sess.lowerTab = ws
+        case 'H': sess.tabs.upper = ws
+        case 'L': sess.tabs.lower = ws
 
     print(f'[SESS#{sess.sessionCode}] Opened WebSocket for role \'{role}\'.')
 
@@ -107,12 +86,13 @@ async def handleWebsocket(code, role):
     except:
         print(f'[SESS#{sess.sessionCode}] Closed WebSocket for role {role}.')
 
+        # Remove the ws.
         match role:
-            case 'upper': sess.upperTab = None
-            case 'lower': sess.lowerTab = None
+            case 'H': sess.tabs.upper = None
+            case 'L': sess.tabs.lower = None
 
         # Delete session if both sockets are None.
-        if sess.upperTab is None and sess.lowerTab is None:
+        if sess.tabs.upper is None and sess.tabs.lower is None:
             try:
                 sman.deleteSession(sess.sessionCode)
 
