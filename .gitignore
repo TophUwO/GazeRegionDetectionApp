@@ -2,3 +2,6 @@
 /.vscode
 /__pycache__
 *.pyc
+*.pem
+*.exe
+*.p12

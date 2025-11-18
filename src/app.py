@@ -12,6 +12,14 @@ sman: SessionManager = SessionManager()
 async def index():
     return await send_from_directory('static', 'index.html')
 
+@app.after_request
+async def add_no_cache_headers(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, proxy-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    response.headers['Surrogate-Control'] = 'no-store'
+    return response
+
 @app.route('/api/create', methods=['POST'])
 async def createSession():
     sess: Session = sman.createSession()

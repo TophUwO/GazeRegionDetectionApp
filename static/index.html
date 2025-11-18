@@ -3,6 +3,7 @@
         <title>Gaze Region Classification</title>
     </head>
     <body>
+        <canvas id="canvasPhoto"></canvas>
         <div class="page" id="pageWelcome">
             <div class="divOuterContainer" id="divWelcome">
                 <button id="btnCreateSession">Create Session</button>
@@ -27,7 +28,6 @@
             <button id="btnContinue">Continue</button>
         </div>
         <div class="page" id="pageIdle">
-            <h1>Screen is idle. Shit is happening on the other screen.</h1>
         </div>
         <div class="page" id="pageShowInstInter">
             <h1>Instructions</h1>
@@ -37,9 +37,15 @@
             <button id="btnStart">Start</button>
         </div>
         <div class="page" id="pageShowInst">
-            <h1>Instructions</h1>
-            Instructions<br>
-            Do the stuff.
+            <h1>Anleitung</h1>
+            In der folgenden Sequenz sehen sie einen roten Ball, der sich innerhalb eines klar abgegrenzten Bereichs hin-
+            und herbounced. Folgen Sie mit ihren Augen diesem Ball. Tun Sie dies bis zum nächsten Bildschirm.
+        </div>
+        <div class="page" id="pageCalibration">
+            <h1>Kalibrierung</h1>
+            <button id="btnConfirmCalibration">Fertig</button>
+            <video id="vidCalibration" autoplay></video>
+            <canvas id="canvasCalibration"></canvas>
         </div>
         <div class="page" id="pageStage1">
             <h1>Stage 1</h1>
@@ -57,7 +63,9 @@
             <h1>A fatal error occurred. Please refresh the page and start anew.</h1>
         </div>
         <div class="page" id="pageFinished">
-            <h1>Fini</h1>
+            <h1>Fertig!</h1>
+            Die Datenerhebung ist hiermit abgeschlossen. Du kannst nun das Browserfenster auf beiden Geräten schließen
+            oder für einen weiteren Run die Seite neuladen.
         </div>
 
         <script>
@@ -67,37 +75,39 @@
             let currPage  = null // currently-active page element
             let sessCode  = ''   // session code
             let submIval  = null // submission interval object
+            let stream    = null // video stream
+            let imgCanvas = null // canvas used for images
+            let _video    = null // video stream element
+            let isInCalib = false
 
             stages = {
                 'stage0': { 'H': 'pageWelcome',       'L': 'pageWelcome',       'time': 0       }, // prep, unused
                 'stage1': { 'H': 'pageShowInstInter', 'L': 'pageIdle',          'time': 0       }, // show inst 1
-                'stage2': { 'H': 'pageStage1',        'L': 'pageShowInst',      'time': 5 * 1   }, // coll 1
+                'stage2': { 'H': 'pageStage1',        'L': 'pageIdle',          'time': 5 * 1   }, // coll 1
                 'stage3': { 'H': 'pageShowInstInter', 'L': 'pageIdle',          'time': 0       }, // show inst 2
-                'stage4': { 'H': 'pageStage2',        'L': 'pageShowInst',      'time': 5 * 1   }, // coll 2
+                'stage4': { 'H': 'pageStage2',        'L': 'pageIdle',          'time': 5 * 1   }, // coll 2
                 'stage5': { 'H': 'pageIdle',          'L': 'pageShowInstInter', 'time': 0       }, // show inst 3
-                'stage6': { 'H': 'pageShowInst',      'L': 'pageStage3',        'time': 5 * 1   }, // coll 3
+                'stage6': { 'H': 'pageIdle',          'L': 'pageStage3',        'time': 5 * 1   }, // coll 3
                 'stage7': { 'H': 'pageShowInstInter', 'L': 'pageIdle',          'time': 0       }, // show inst 4
-                'stage8': { 'H': 'pageStage4',        'L': 'pageStage4',        'time': 10 * 1  }, // coll 4
+                'stage8': { 'H': 'pageIdle',          'L': 'pageIdle',          'time': 10 * 1  }, // coll 4
                 'stage9': { 'H': 'pageFinished',      'L': 'pageFinished',      'time': 0       }  // fini
             };
 
             function switchToPage(pageName) {
                 // Hide the current page.
-                if (currPage != null) {
+                if (currPage != null)
                     currPage.style.display = 'none'
-                }
 
                 // Show the next page.
                 currPage = document.getElementById(pageName)
-                if (currPage == null) {
+                if (currPage == null)
                     currPage = document.getElementById('pageFatalError')
-                }
                 currPage.style.display = 'block'
             }
 
             function setupWebsocket() {
                 // Open websocket.
-                webSocket = new WebSocket(`ws://${location.host}/ws/${sessCode}/${roleId}`)
+                webSocket = new WebSocket(`wss://${location.host}/ws/${sessCode}/${roleId}`)
                 {
                     webSocket.onopen    = wsOnOpen
                     webSocket.onmessage = wsOnMessage
@@ -113,8 +123,11 @@
 
                 switch (response.command) {
                     case 'ready':
-                        switchToPage('pageSessionReady')
+                        switchToPage('pageCalibration')
+                        setupCamera('vidCalibration')
 
+                        isInCalib = true
+                        doOverlay()
                         break
                     case 'start_stage':
                         context = stages[`stage${response.value}`]
@@ -136,8 +149,6 @@
                                 // Set submission interval, but only for the upper tablet.
                                 if (roleId == 'H')
                                     submIval = setInterval(async() => {
-                                        console.log('took photo')
-
                                         await fetch(`/api/submit/${sessCode}`, { method: 'POST' })
                                     }, (1.0/3.0)*1000.0)
                                 else
@@ -146,6 +157,57 @@
                         }
                         break
                 }
+            }
+
+            async function setupCamera(video) {
+                _video = document.getElementById(video)
+
+                vid = null
+                if (video != null)
+                    vid = document.getElementById(video);
+
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' } } })
+
+                    if (video != null)
+                        vid.srcObject = stream
+                } catch (err) {
+                    webSocket.send(JSON.stringify({ 'message': `Could not access camera. Reason: ${err}.` }))
+
+                    console.error('Could not access camera', err)
+                }
+            }
+
+            function stopCamera() {
+                if (!stream)
+                    return;
+
+                stream.getTracks().forEach(element => element.stop());
+                stream = null
+            }
+
+            function doOverlay() {
+                canvas = document.getElementById('canvasCalibration')
+
+                _video.addEventListener('loadedmetadata', () => {
+                    canvas.width = _video.videoWidth
+                    canvas.height = _video.videoHeight
+
+                    requestAnimationFrame(drawOverlay)
+                })
+            }
+
+            function drawOverlay() {
+                if (!isInCalib)
+                    return;
+
+                canvas = document.getElementById('canvasCalibration')
+                ctx = canvas.getContext('2d')
+
+                ctx.drawImage(_video, 0, 0, canvas.width, canvas.height)
+                ctx.strokeRect(0, 0.25*canvas.height, canvas.width, 0.5*canvas.height)
+
+                requestAnimationFrame(drawOverlay)
             }
 
             document.getElementById('btnCreateSession').addEventListener('click', async() => {
@@ -202,6 +264,13 @@
                 await fetch(`api/advance/${sessCode}`, { method: 'POST' })
             })
 
+            document.getElementById('btnConfirmCalibration').addEventListener('click', async() => {
+                stopCamera();
+                isInCalib = false
+
+                switchToPage('pageSessionReady')
+            })
+
             // Switch to welcome page so that we can do stuff.
             switchToPage('pageWelcome')
         </script>
@@ -247,6 +316,14 @@
             }
 
             .page {
+                display: none;
+            }
+
+            #canvasPhoto { 
+                display: none;
+            }
+
+            #vidCalibration {
                 display: none;
             }
         </style>

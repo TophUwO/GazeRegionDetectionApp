@@ -73,6 +73,8 @@ class Session:
         tab: any = self.tabs.upper if roleId == 'H' else self.tabs.lower if roleId == 'L' else None
         if tab is None:
             print(f'error: Invalid role ID \'{roleId}\'.')
+
+            return
         await tab.send(msg)
 
 

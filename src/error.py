@@ -1,4 +1,3 @@
-from json import  dumps
 from enum import  Enum
 from quart import Response, jsonify
 
@@ -11,15 +10,14 @@ class ResponseStatus(Enum):
     InternalError       = 4
 
 
-GL_ERRORDICT: dict[ResponseStatus, tuple[str, str, int]] = {
-    ResponseStatus.Ok:                  ('ok',    'no error',                 200),
-    ResponseStatus.InvalidSessionToken: ('error', 'Invalid session token.',   404),
-    ResponseStatus.SessionNotFound:     ('error', 'Session not found.',       404),
-    ResponseStatus.InternalError:       ('error', 'Internal error occurred.', 500)
-}
-
-
 def FormatResponse(type: ResponseStatus, payload: dict[str, any] | None = None) -> tuple[Response, int]:
+    GL_ERRORDICT: dict[ResponseStatus, tuple[str, str, int]] = {
+        ResponseStatus.Ok:                  ('ok',    'no error',                 200),
+        ResponseStatus.InvalidSessionToken: ('error', 'Invalid session token.',   404),
+        ResponseStatus.SessionNotFound:     ('error', 'Session not found.',       404),
+        ResponseStatus.InternalError:       ('error', 'Internal error occurred.', 500)
+    }
+    
     try:
         cat, msg, code = GL_ERRORDICT[type]
 
