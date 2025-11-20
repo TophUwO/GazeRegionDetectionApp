@@ -86,6 +86,12 @@ class SessionManager:
         def int_GenSessCode() -> str:
             return ''.join(choices('abcdef0123456789', k=6))
         
+        # If no free sessions are left, we simply return an error.
+        if len(self.sessionDict) == 2**24:
+            print('error: No session codes left.')
+
+            return None
+
         # Create the new session.
         while True:
             sess: Session = Session(sessionCode=int_GenSessCode())

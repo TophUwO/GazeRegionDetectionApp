@@ -2,10 +2,15 @@ from quart   import Quart, send_from_directory, request, websocket
 from session import *
 from error   import *
 from json    import *
+from time    import *
+from base64  import *
 
 
 app:  Quart          = Quart(__name__)
 sman: SessionManager = SessionManager()
+
+
+ctr = 0
 
 
 @app.route('/')
@@ -13,12 +18,14 @@ async def index():
     return await send_from_directory('static', 'index.html')
 
 @app.after_request
-async def add_no_cache_headers(response):
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, proxy-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
+async def disableClientSideCaching(response: Response):
+    response.headers['Cache-Control']     = 'no-store, no-cache, must-revalidate, proxy-revalidate'
+    response.headers['Pragma']            = 'no-cache'
+    response.headers['Expires']           = '0'
     response.headers['Surrogate-Control'] = 'no-store'
+
     return response
+
 
 @app.route('/api/create', methods=['POST'])
 async def createSession():
@@ -50,8 +57,12 @@ async def advanceStage(code):
     if sess is None:
         return FormatResponse(ResponseStatus.SessionNotFound)
     
+    global ctr
+    ctr = 0
     sess.advanceStage()
     await sess.sendRole('any', 'start_stage', sess.stageId)
+    if sess.stageId == 9:
+        await sess.sendRole('H', 'fini', '')
     return FormatResponse(ResponseStatus.Ok)
 
 @app.route('/api/submit/<code>', methods=['POST'])
@@ -62,11 +73,41 @@ async def saveImage(code):
     elif not sess.stage.canSupply:
         return FormatResponse(ResponseStatus.CannotSupplyImages)
     
-    # Get files.
-    for fname, img in (await request.files).items():
-        print(f'Got file \'{fname}\'.')
+    data = await request.get_json()
+    image_data = data["image"]
+
+    # Remove "data:image/jpeg;base64," prefix if present
+    if image_data.startswith("data:image"):
+        header, image_data = image_data.split(",", 1)
+
+    # Decode base64
+    image_bytes = b64decode(image_data)
+
+    # Save to file
+    global ctr
+    with open(f"files/img_{code}_{sess.stageId}_{ctr}.jpg", "wb") as f:
+        f.write(image_bytes)
+    ctr += 1
 
     print('processed files')
+    return FormatResponse(ResponseStatus.Ok)
+
+@app.route('/api/pause/<code>', methods=['POST'])
+async def pause(code):
+    sess: Session = sman.getSession(code)
+    if sess is None:
+        return FormatResponse(ResponseStatus.SessionNotFound)
+    
+    await sess.sendRole('any', 'pause', time() + 1)
+    return FormatResponse(ResponseStatus.Ok)
+
+@app.route('/api/resume/<code>', methods=['POST'])
+async def resume(code):
+    sess: Session = sman.getSession(code)
+    if sess is None:
+        return FormatResponse(ResponseStatus.SessionNotFound)
+    
+    await sess.sendRole('any', 'resume', time() + 1)
     return FormatResponse(ResponseStatus.Ok)
 
 
