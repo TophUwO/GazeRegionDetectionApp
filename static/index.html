@@ -67,6 +67,27 @@
         </div>
 
         <script>
+            // todo:
+            //  - MUST:
+            //   - refactor the whole thing
+            //    - work out better data layout and not so many fucking globals
+            //    - rework page table to be classes
+            //    - refactor bouncing logic
+            //    - rework HTML to be less redundant
+            //    - make camera shit not be ugly
+            //    - better and more useful calibration screen
+            //    - use some basic layouting-techniques
+            //    - own JS and CSS (not inline)
+            //    - check secure context + better error handling and all that
+            //    - make easier to maintain and edit parameters for customization
+            //    - documentation of execution environment and how it is supposed to be used
+            //     - offload constants to own struct so that they can be changed easily
+            //  - OPT:
+            //   - pause and resume
+            //   - visible timer
+            //   - audible signals
+            //   - light- and dark mode
+
             let webSocket      = null  // websocket for comms
             let roleId         = ''    // ID of this client's role
             let stageId        = 0     // ID of the current stage

@@ -48,7 +48,7 @@ async def joinSession():
         return FormatResponse(ResponseStatus.SessionNotFound)
     
     # All good.
-    await sess.sendRole('H', 'ready', '')
+    await sess.sendRole('H', 'ready')
     return FormatResponse(ResponseStatus.Ok)
 
 @app.route('/api/advance/<code>', methods=['POST'])
@@ -62,7 +62,7 @@ async def advanceStage(code):
     sess.advanceStage()
     await sess.sendRole('any', 'start_stage', sess.stageId)
     if sess.stageId == 9:
-        await sess.sendRole('H', 'fini', '')
+        await sess.sendRole('H', 'fini')
     return FormatResponse(ResponseStatus.Ok)
 
 @app.route('/api/submit/<code>', methods=['POST'])
@@ -89,25 +89,6 @@ async def saveImage(code):
         f.write(image_bytes)
     ctr += 1
 
-    print('processed files')
-    return FormatResponse(ResponseStatus.Ok)
-
-@app.route('/api/pause/<code>', methods=['POST'])
-async def pause(code):
-    sess: Session = sman.getSession(code)
-    if sess is None:
-        return FormatResponse(ResponseStatus.SessionNotFound)
-    
-    await sess.sendRole('any', 'pause', time() + 1)
-    return FormatResponse(ResponseStatus.Ok)
-
-@app.route('/api/resume/<code>', methods=['POST'])
-async def resume(code):
-    sess: Session = sman.getSession(code)
-    if sess is None:
-        return FormatResponse(ResponseStatus.SessionNotFound)
-    
-    await sess.sendRole('any', 'resume', time() + 1)
     return FormatResponse(ResponseStatus.Ok)
 
 

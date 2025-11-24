@@ -54,7 +54,7 @@ class Session:
             case 'H': self.tabs.upper = ws
             case 'L': self.tabs.lower = ws
 
-    async def sendRole(self, roleId: str, cmd: str, value: any) -> None:
+    async def sendRole(self, roleId: str, cmd: str, value: any = None) -> None:
         # Format message.
         msg: str = f'''
             {{
