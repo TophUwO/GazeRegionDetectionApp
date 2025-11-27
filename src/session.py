@@ -1,4 +1,6 @@
-from random      import *
+from os          import makedirs, listdir
+from os.path     import isdir, exists
+from random      import choices
 from dataclasses import dataclass, field
 
 
@@ -18,6 +20,7 @@ class Session:
     sessionCode: str   = ''
     tabs:        Pair  = field(default_factory=lambda: Pair(None, None))
     stageId:     int   = 0
+    idx:         int   = 0
     stage:       Stage = field(default_factory=lambda: Stage(None, False, False))
 
     def advanceStage(self) -> None:
@@ -35,6 +38,7 @@ class Session:
         }
 
         self.stageId += 1
+        self.idx      = 0
         try:
             self.stage = GL_SESSTAB[self.stageId]
         except KeyError:
@@ -56,7 +60,7 @@ class Session:
 
     async def sendRole(self, roleId: str, cmd: str, value: any = None) -> None:
         # Format message.
-        msg: str = f'''
+        msg = f'''
             {{
                 "command": "{cmd}",
                 "value":   "{value}"
@@ -82,6 +86,13 @@ class SessionManager:
     def __init__(self) -> None:
         self.sessionDict: dict[str, Session] = {}
 
+        # Add 'pseudo'-sessions for the ones already created. These are the ones that are already in files/raw.
+        if exists('files/raw'):
+            for ent in listdir('files/raw'):
+                if isdir(ent):
+                    self.sessionDict[ent] = Session(sessionCode=ent)
+
+
     def createSession(self) -> Session:
         def int_GenSessCode() -> str:
             return ''.join(choices('abcdef0123456789', k=6))
@@ -94,13 +105,17 @@ class SessionManager:
 
         # Create the new session.
         while True:
-            sess: Session = Session(sessionCode=int_GenSessCode())
+            sess = Session(sessionCode=int_GenSessCode())
 
             # Add session.
             if sess.sessionCode in self.sessionDict:
                 continue
             self.sessionDict[sess.sessionCode] = sess
             break
+
+        # Create directories.
+        makedirs(f'files/raw/{sess.sessionCode}')
+        makedirs(f'files/proc/{sess.sessionCode}')
 
         # All good.
         return sess
@@ -112,6 +127,8 @@ class SessionManager:
         self.sessionDict.pop(code)
     
     def getSession(self, code: str) -> Session | None:
-        return self.sessionDict.get(code, None)
+        sessCode = code.lower()
+
+        return self.sessionDict.get(sessCode, None)
     
 

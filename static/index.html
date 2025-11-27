@@ -267,7 +267,7 @@
                                     
                                     if (roleId == currStage.active)
                                         switchToPage('pageStageInterm')
-                                }, currStage.time * 1 * 1000)
+                                }, currStage.time * 2 * 1000)
                                 
                                 // Set submission interval, but only for the upper tablet.
                                 if (roleId == 'H') {
@@ -301,7 +301,12 @@
                     vid = document.getElementById(video);
 
                 try {
-                    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' } } })
+                    stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1920 },
+    height: { ideal: 1080 }, facingMode: { ideal: 'user' } } })
+
+                    const track = stream.getVideoTracks()[0];
+                    webSocket.send(JSON.stringify({ 'message': track.getCapabilities() }))
+                    //console.log(track.getCapabilities());
 
                     if (video != null)
                         vid.srcObject = stream
@@ -322,8 +327,8 @@
                 canvas = document.getElementById('canvasCalibration')
 
                 _video.addEventListener('loadedmetadata', () => {
-                    canvas.width  = _video.videoWidth
-                    canvas.height = _video.videoHeight
+                    canvas.width  = 576
+                    canvas.height = 480
 
                     requestAnimationFrame(drawOverlay)
                 })

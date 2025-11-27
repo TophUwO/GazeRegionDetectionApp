@@ -1,16 +1,18 @@
 from quart   import Quart, send_from_directory, request, websocket
 from session import *
 from error   import *
+from parse   import FaceParser
 from json    import *
 from time    import *
 from base64  import *
 
 
-app:  Quart          = Quart(__name__)
-sman: SessionManager = SessionManager()
+app    = Quart(__name__)
+sman   = SessionManager()
+parser = FaceParser((1920, 1080))
 
 
-ctr = 0
+# Run with hypercorn src/app:app --bind 0.0.0.0:443 --certfile 192.168.0.130+1.pem --keyfile 192.168.0.130+1-key.pem
 
 
 @app.route('/')
@@ -29,7 +31,7 @@ async def disableClientSideCaching(response: Response):
 
 @app.route('/api/create', methods=['POST'])
 async def createSession():
-    sess: Session = sman.createSession()
+    sess = sman.createSession()
 
     print(f'[SESS#{sess.sessionCode}] Opened session.')
 
@@ -43,7 +45,7 @@ async def joinSession():
         return FormatResponse(ResponseStatus.InvalidSessionToken)
     
     # Get session.
-    sess: Session = sman.getSession(code)
+    sess = sman.getSession(code)
     if sess is None:
         return FormatResponse(ResponseStatus.SessionNotFound)
     
@@ -53,12 +55,10 @@ async def joinSession():
 
 @app.route('/api/advance/<code>', methods=['POST'])
 async def advanceStage(code):
-    sess: Session = sman.getSession(code)
+    sess = sman.getSession(code)
     if sess is None:
         return FormatResponse(ResponseStatus.SessionNotFound)
     
-    global ctr
-    ctr = 0
     sess.advanceStage()
     await sess.sendRole('any', 'start_stage', sess.stageId)
     if sess.stageId == 9:
@@ -67,7 +67,7 @@ async def advanceStage(code):
 
 @app.route('/api/submit/<code>', methods=['POST'])
 async def saveImage(code):
-    sess: Session = sman.getSession(code)
+    sess = sman.getSession(code)
     if sess is None:
         return FormatResponse(ResponseStatus.SessionNotFound)
     elif not sess.stage.canSupply:
@@ -84,18 +84,18 @@ async def saveImage(code):
     image_bytes = b64decode(image_data)
 
     # Save to file
-    global ctr
-    with open(f"files/img_{code}_{sess.stageId}_{ctr}.jpg", "wb") as f:
+    with open(f"files/raw/{code}/raw_{code}_{sess.stageId}_{sess.idx}.jpg", "wb") as f:
         f.write(image_bytes)
-    ctr += 1
+    sess.idx += 1
 
+    await parser.processRawImage(image_bytes, code, sess.stageId, sess.idx)
     return FormatResponse(ResponseStatus.Ok)
 
 
 @app.websocket('/ws/<code>/<role>')
 async def handleWebsocket(code, role):
     # Get session.
-    sess: Session = sman.getSession(code)
+    sess = sman.getSession(code)
     if sess is None or role not in ['H', 'L']:
         await websocket.close()
 
