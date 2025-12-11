@@ -88,6 +88,7 @@ async def saveImage(code):
         f.write(image_bytes)
     sess.idx += 1
 
+    # TODO: make it so that this runs in a worker thread
     await parser.processRawImage(image_bytes, code, sess.stageId, sess.idx)
     return FormatResponse(ResponseStatus.Ok)
 

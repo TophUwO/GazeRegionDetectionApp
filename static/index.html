@@ -82,6 +82,7 @@
             //    - make easier to maintain and edit parameters for customization
             //    - documentation of execution environment and how it is supposed to be used
             //     - offload constants to own struct so that they can be changed easily
+            //    - make photo and send async so that the thing isn't lagging
             //  - OPT:
             //   - pause and resume
             //   - visible timer
@@ -401,19 +402,6 @@
 
                 if (json.type == 'error')
                     console.error(`Error trying to advance stage. Reason: ${json.desc}`)
-            }
-
-            async function pause() {
-                isPaused       = true;
-                lastPausedTime = (new Date()).getTime()
-
-                await fetch(`/api/pause/${sessCode}`, { method: 'POST' })
-            }
-            
-            async function resume() {
-                isPaused = false
-
-                await fetch(`api/resume/${sessCode}`, { method: 'POST' })
             }
 
             document.getElementById('btnCreateSession').addEventListener('click', async() => {

@@ -53,9 +53,9 @@ class BoundingBox:
     def pad(self, extra: BoundingBox | tuple[float, float, float, float]) -> BoundingBox:
         l, t, r, b = extra
 
-        self.left  = max(0,    self.left   - l)
-        self.top   = max(0,    self.top    - t)
-        self.right = min(1920, self.right  + r)
+        self.left  = max(0,     self.left   - l)
+        self.top   = max(0,     self.top    - t)
+        self.right = min(1920,  self.right  + r)
         self.bottom = min(1080, self.bottom + b)
 
         return self
@@ -83,7 +83,7 @@ class FaceParser:
         try:
             res = self._det.detect(mpImg).face_landmarks[0]
         except IndexError:
-            print(f'[STAGE#{sessId}] warning: No face detected for stage {stId} (idx: {idx}).')
+            print(f'[SESS#{sessId}] warning: No face detected for stage {stId} (idx: {idx}).')
 
             return
         # Calculate bounding boxes.

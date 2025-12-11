@@ -32,6 +32,6 @@ def FormatResponse(type: ResponseStatus, payload: dict[str, any] | None = None) 
     except KeyError:
         print(f'error: Invalid response status \'{cat}\'.')
 
-    return FormatResponse(ResponseStatus.InternalError, { '__extra__': 'invalid response type' })
+    return FormatResponse(ResponseStatus.InternalError, { '__extra__': f'invalid response status \'{type.name}\'' })
 
 
