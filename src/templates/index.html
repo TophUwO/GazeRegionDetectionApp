@@ -46,20 +46,16 @@
             Tippen Sie auf "Starten", um die Sequenz zu starten.
             <button id="btnStartStage4">Start</button>
         </div>
-        <div class="page" id="pageCalibration">
-            <h1>Kalibrierung</h1>
-            <button id="btnConfirmCalibration">Fertig</button>
-            <video id="vidCalibration" autoplay></video>
-            <canvas id="canvasCalibration"></canvas>
-        </div>
         <div class="page" id="pageStage">
             <canvas id="canvasArea"></canvas>
         </div>
-        <div class="page" id="pageInterm">
-            <h1 id="h1IntermTitle"></h1>
+        <div class="page" id="viewInterm">
+            <h1 id="h1IntermCaption"></h1>
             <label id="lblIntermText"></label>
 
-            Klicke auf "Weiter", um zum nächsten Schritt zu gelangen.
+            <canvas id="cvCalibrationOverlay"></canvas>
+
+            Press 'Continue' to get to the next stage.
             <button id="btnIntermCont"></button>
         </div>
         <div class="page" id="viewFatalError">

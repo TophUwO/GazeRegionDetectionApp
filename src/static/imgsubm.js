@@ -51,7 +51,7 @@ export class ImageSubmitter {
 
     destroy() {
         if (!this.stream)
-            return;
+            return
 
         this.stream.getTracks().forEach(element => element.stop());
     }

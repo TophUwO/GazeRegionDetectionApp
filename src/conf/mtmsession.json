@@ -7,8 +7,12 @@
 
     "stages": [
         {
-            "id":     0,
-            "roleId": "top",
+            "id":   0,
+            "desc": "",
+            "inst": {
+                "roleId": "top",
+                "text":   ""
+            },
 
             "region": {
                 "x": 0.0,
@@ -19,8 +23,12 @@
             "time": 180
         },
         {
-            "id":     1,
-            "roleId": "top",
+            "id":   1,
+            "desc": "",
+            "inst": {
+                "roleId": "top",
+                "text":   ""
+            },
 
             "region": {
                 "x": 0.0,
@@ -31,19 +39,29 @@
             "time": 180
         },
         {
-            "id":     2,
-            "roleId": "bottom",
+            "id":   2,
+            "desc": "",
+            "inst": {
+                "roleId": "bottom",
+                "text":   ""
+            },
 
             "region": {
-                "x": 0.0,
-                "y": 0.0,
-                "w": 1.0,
-                "h": 1.0
+                "roleId": "bottom",
+                "x":      0.0,
+                "y":      0.0,
+                "w":      1.0,
+                "h":      1.0
             },
             "time": 180
         },
         {
             "id":   3,
+            "desc": "",
+            "inst": {
+                "roleId": "top",
+                "text":   ""
+            },
 
             "time": 180
         }

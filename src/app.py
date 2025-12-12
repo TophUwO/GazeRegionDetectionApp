@@ -1,5 +1,5 @@
 from __future__            import annotations
-from quart                 import Quart, send_from_directory, render_template, request, websocket, Response
+from quart                 import Quart, Response, render_template, request, websocket
 from session               import *
 from error                 import ResponseStatus, FormatResponse
 from parse                 import FaceParser
@@ -7,7 +7,6 @@ from json                  import loads
 from base64                import *
 from os                    import getenv
 from jsonschema            import validate
-from jsonschema.exceptions import SchemaError, ValidationError
 
 
 class DataCollectionApp(Quart):
@@ -179,7 +178,9 @@ async def handleWebsocket(code, role):
         while True:
             data = await websocket.receive_json()
 
-            print(f'[SESS#{sess.sessionCode}] Received JSON from role \'{role}\': {data}')
+            match data['type']:
+                case 'msg':
+                    print(f'[SESS#{sess.sessionCode}] Received JSON from role \'{role}\': {data}')
     except:
         print(f'[SESS#{sess.sessionCode}] Closed WebSocket for role {role}.')
 

@@ -1,52 +1,17 @@
-import { ImageSubmitter } from './imgsubm.js'
+import { ImageSubmitter        } from './imgsubm.js'
+import { SessionWebSocket      } from './ws.js'
+import { CalibrationManagement } from './calib.js'
 
 
 /**
  */
-class SessionControlWebSocket {
-    /**
-     */
-    constructor(obj) {
-        this.wsObj = obj
+const IntermediateViewType = Object.freeze({
+    READY:        ['READY',        0,  1],
+    CALIBRATION:  ['CALIBRATION',  1,  2],
+    INSTRUCTIONS: ['INSTRUCTIONS', 2, -1],
+    END:          ['END',          3,  2]
+})
 
-        this.wsObj.onmessage = this.onMessage.bind(this)
-    }
-
-
-    /**
-     */
-    onMessage() {
-
-    }
-
-
-    /**
-     */
-    static async Create(role, sessionCode) {
-        /* Connect to websocket. */
-        let websocketObj = null
-        {
-            const wsConnProc = new Promise((resolve, reject) => {
-                websocketObj = new WebSocket(`wss://${location.host}/ws/${sessionCode}/${role}`)
-
-                websocketObj.onopen  = ()   => { 
-                    websocketObj.send(JSON.stringify({ 'message': `hello from role ${role}.` }))
-
-                    resolve(websocketObj)
-                }
-                websocketObj.onerror = (ev) => {
-                    const err = new Error(`Could not initialize websocket. Reason: ${ev}`)
-
-                    reject(err)
-                }
-            })
-            await wsConnProc
-        }
-
-        /* Create actual websocket object. */
-        return new SessionControlWebSocket(websocketObj)
-    }
-}
 
 /**
  */
@@ -54,12 +19,15 @@ export class SessionControl {
     /**
      */
     constructor() {
-        this.config       = null
-        this.imgSubmitter = null
-        this.currViewId   = null
-        this.roleId       = null
-        this.sessionCode  = null
-        this.websocket    = null
+        this.config         = null
+        this.imgSubmitter   = null
+        this.currViewId     = null
+        this.roleId         = null
+        this.sessionCode    = null
+        this.websocket      = null
+        this.currToken      = null
+        this.currIntermView = null
+        this.calibMngt      = null
 
         try {
             this.initializeInteractiveElements()
@@ -77,15 +45,17 @@ export class SessionControl {
 
         /* Create listener for the 'Create session' button in the 'Welcome' view. */
         crBtn.addEventListener('click', async() => {
-            const response = await fetch('/api/create', { method: 'POST' })
-            const data     = await response.json()
+            const res  = await fetch('/api/create', {
+                method: 'POST'
+            })
+            const data = await response.json()
 
             if (data.type == 'ok') {
                 this.roleId      = data.payload.role
                 this.sessionCode = data.payload.code
 
                 /* Create websocket. */
-                this.websocket = await SessionControlWebSocket.Create(this.roleId, this.sessionCode)
+                this.websocket = await SessionWebSocket.Create(this, this.roleId, this.sessionCode)
 
                 /* Show session code so that the user can enter it in another client supposed to join the session. */
                 this.switchToView('viewCodeDisplay')
@@ -94,13 +64,13 @@ export class SessionControl {
                     if (codeDispLabel == null) {
                         this.displayFatalError('Could not display session code.')
 
-                        return;
+                        return
                     }
 
                     codeDispLabel.textContent = `Session Code: ${this.sessionCode}`
                 }
 
-                return;
+                return
             }
 
             /*
@@ -126,27 +96,27 @@ export class SessionControl {
                         'page to retry.'
                     )
 
-                    return;
+                    return
                 }
             }
 
-            const response = await fetch('/api/join', { 
+            const res  = await fetch('/api/join', { 
                 method:  'POST',
                 headers: {
                     'session': code
                 }
             })
-            const data     = await response.json()
+            const data = await res.json()
 
             if (data.type == 'ok') {
                 this.roleId      = data.payload.role
                 this.sessionCode = data.payload.code
 
                 /* Create websocket. */
-                this.websocket = await SessionControlWebSocket.Create(this.roleId, this.sessionCode)
+                this.websocket = await SessionWebSocket.Create(this.roleId, this.sessionCode)
 
                 this.switchToIdleView()
-                return;
+                return
             }
 
             /* Error occurred. */
@@ -171,8 +141,37 @@ export class SessionControl {
         this.currViewId = viewId
     }
 
+    /**
+     */
     switchToIdleView() {
         this.switchToView('viewIdle')
+    }
+
+    /**
+     * @todo intermViewType must be one of the values of 'IntermediateViewType' directly or else it will not match
+     */
+    switchToIntermediateView(intermViewType) {
+        const cap = document.getElementById('h1IntermCaption')
+        const txt = document.getElementById('lblIntermText')
+
+        const [id, n, next] = intermViewType
+
+        /* Setup intermediate view. */
+        switch (intermViewType) {
+            case IntermediateViewType.READY:
+                cap.textContent = 'Ready'
+                txt.textContent = 'Session has successfully been initialized. Data collection can now be started.'
+
+                break
+            default:
+                console.error(`Unknown intermediate view type \"${id}\" (${n}).`)
+
+                return
+        }
+        this.currIntermView = intermViewType
+
+        /* Switch to the intermediate view. */
+        this.switchToView('viewInterm')
     }
 
     /**
@@ -190,7 +189,30 @@ export class SessionControl {
     /**
      */
     destroy() {
-        this.imgSubmitter.destroy()
+        if (this.imgSubmitter != null) this.imgSubmitter.destroy()
+        if (this.calibMngt != null)    this.calibMngt.destroy()
+    }
+
+
+    /** 
+     */
+    onNewToken(msgObj) {
+        if (msgObj.tok == undefined) {
+            console.error(`Command \"${msgObj.type}\" requires a parameter of name \"tok\".`)
+
+            return
+        }
+
+        this.currToken = msgObj.tok
+    }
+
+    /**
+     */
+    onReady() {
+        if (this.roleId != this.config.creatorRole)
+            return
+
+        this.switchToIntermediateView(IntermediateViewType.READY)
     }
 
 
@@ -199,6 +221,7 @@ export class SessionControl {
     static async Create() {
         let config
         let imgSubmit
+        let calibMngt
 
         /* Create session control. */
         const sessCtrl = new SessionControl()
@@ -227,6 +250,13 @@ export class SessionControl {
                 //    'Could not initialize image submitter component. Perhaps no camera is installed or the ' +
                 //    'application is not allowed to use it.'
                 //)
+        }
+
+        /* Create the calibration management component. */
+        calibMngt = new CalibrationManagement()
+        {
+            if (calibMngt == null)
+                throw new Error('Could not initialize calibration management component.')
         }
 
         /* All good. Set instance properties. */
