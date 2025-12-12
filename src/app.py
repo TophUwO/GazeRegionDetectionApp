@@ -1,23 +1,83 @@
-from quart   import Quart, send_from_directory, request, websocket
-from session import *
-from error   import *
-from parse   import FaceParser
-from json    import *
-from time    import *
-from base64  import *
+from __future__            import annotations
+from quart                 import Quart, send_from_directory, render_template, request, websocket, Response
+from session               import *
+from error                 import ResponseStatus, FormatResponse
+from parse                 import FaceParser
+from json                  import loads
+from base64                import *
+from os                    import getenv
+from jsonschema            import validate
+from jsonschema.exceptions import SchemaError, ValidationError
 
 
-app    = Quart(__name__)
-sman   = SessionManager()
-parser = FaceParser((1920, 1080))
+class DataCollectionApp(Quart):
+    def _readSessionConfigFile(self) -> bool:
+        try:
+            with open(self._cfgFileName) as fp:
+                self._rawCfgFileContents = fp.read()
+        except OSError as exc:
+            print(f'error: Could not open session configuration file. Reason: {exc}')
+
+            return False
+        
+        # All good.
+        return True
+    
+    def _validateSessionConfig(self) -> bool:
+        CONFIG_SCHEMA = r'''
+            {
+
+            }
+        '''
+
+        try:
+            self._cfgDict = loads(self._rawCfgFileContents)
+
+            validate(self._cfgDict, loads(CONFIG_SCHEMA))
+        except Exception as exc:
+            print(f'error: Session configuration file validation failed. Reason: {exc}')
+
+            return False
+        
+        # All good.
+        return True
 
 
-# Run with hypercorn src/app:app --bind 0.0.0.0:443 --certfile 192.168.0.130+1.pem --keyfile 192.168.0.130+1-key.pem
+    def __init__(self):
+        super().__init__(__name__)
+
+        # Read config from env.
+        self._cfgFileName        = getenv('DATACOLL_USED_REGION_CONFIG')
+        self._rawCfgFileContents = ''
+        self._cfgDict            = {}
+
+        if not self._cfgFileName or self._cfgFileName == '' or not self._readSessionConfigFile():
+            print(
+                'error: Could not load session configuration file. Set \'DATACOLL_USED_REGION_CONFIG\' to the '
+                'file containing a valid session configuration.'
+            )
+
+            exit(1)
+
+        # Validate session config.
+        if not self._validateSessionConfig():
+            exit(1)
+
+        # Initialize sub-components.
+        self.sman   = SessionManager()
+        self.parser = FaceParser((1920, 1080))
+
+        print('info: Initialized application. Ready.')
+
+
+# On windows powershell run with:
+#     $env:DATACOLL_USED_REGION_CONFIG="src/conf/mtmsession.json"; hypercorn src/app:app --bind 0.0.0.0:8443 --certfile 192.168.0.130+1.pem --keyfile 192.168.0.130+1-key.pem
+app = DataCollectionApp()
 
 
 @app.route('/')
 async def index():
-    return await send_from_directory('static', 'index.html')
+    return await render_template('index.html', GL_SESSION_CONFIG=app._cfgDict)
 
 @app.after_request
 async def disableClientSideCaching(response: Response):
@@ -31,31 +91,38 @@ async def disableClientSideCaching(response: Response):
 
 @app.route('/api/create', methods=['POST'])
 async def createSession():
-    sess = sman.createSession()
+    # TODO: can fail
+    sess = app.sman.createSession()
 
     print(f'[SESS#{sess.sessionCode}] Opened session.')
 
     # Return session code.
-    return FormatResponse(ResponseStatus.Ok, { 'code': sess.sessionCode })
+    return FormatResponse(ResponseStatus.Ok, { 
+        'code': sess.sessionCode,
+        'role': app._cfgDict['creatorRole']
+    })
 
 @app.route('/api/join', methods=['POST'])
 async def joinSession():
-    code = request.args.get('code', None)
+    code = request.headers.get('session', type=str, default=None)
     if code is None:
         return FormatResponse(ResponseStatus.InvalidSessionToken)
     
     # Get session.
-    sess = sman.getSession(code)
+    sess = app.sman.getSession(code)
     if sess is None:
         return FormatResponse(ResponseStatus.SessionNotFound)
     
     # All good.
-    await sess.sendRole('H', 'ready')
-    return FormatResponse(ResponseStatus.Ok)
+    # await sess.sendRole('H', 'ready')
+    return FormatResponse(ResponseStatus.Ok, {
+        'code': sess.sessionCode,
+        'role': app._cfgDict['joinerRole']
+    })
 
 @app.route('/api/advance/<code>', methods=['POST'])
 async def advanceStage(code):
-    sess = sman.getSession(code)
+    sess = app.sman.getSession(code)
     if sess is None:
         return FormatResponse(ResponseStatus.SessionNotFound)
     
@@ -67,7 +134,7 @@ async def advanceStage(code):
 
 @app.route('/api/submit/<code>', methods=['POST'])
 async def saveImage(code):
-    sess = sman.getSession(code)
+    sess = app.sman.getSession(code)
     if sess is None:
         return FormatResponse(ResponseStatus.SessionNotFound)
     elif not sess.stage.canSupply:
@@ -89,22 +156,21 @@ async def saveImage(code):
     sess.idx += 1
 
     # TODO: make it so that this runs in a worker thread
-    await parser.processRawImage(image_bytes, code, sess.stageId, sess.idx)
+    await app.parser.processRawImage(image_bytes, code, sess.stageId, sess.idx)
     return FormatResponse(ResponseStatus.Ok)
 
 
 @app.websocket('/ws/<code>/<role>')
 async def handleWebsocket(code, role):
     # Get session.
-    sess = sman.getSession(code)
-    if sess is None or role not in ['H', 'L']:
+    sess = app.sman.getSession(code)
+    if sess is None or role not in app._cfgDict['roleIds']:
         await websocket.close()
 
     # Set the websocket connection.
     ws = websocket._get_current_object()
-    match role:
-        case 'H': sess.tabs.upper = ws
-        case 'L': sess.tabs.lower = ws
+    if   role == app._cfgDict.get('creatorRole'): sess.tabs.upper = ws
+    elif role == app._cfgDict.get('joinerRole'):  sess.tabs.lower = ws
 
     print(f'[SESS#{sess.sessionCode}] Opened WebSocket for role \'{role}\'.')
 
@@ -118,14 +184,13 @@ async def handleWebsocket(code, role):
         print(f'[SESS#{sess.sessionCode}] Closed WebSocket for role {role}.')
 
         # Remove the ws.
-        match role:
-            case 'H': sess.tabs.upper = None
-            case 'L': sess.tabs.lower = None
+        if   role == app._cfgDict.get('creatorRole'): sess.tabs.upper = None
+        elif role == app._cfgDict.get('joinerRole'):  sess.tabs.lower = None
 
         # Delete session if both sockets are None.
         if sess.tabs.upper is None and sess.tabs.lower is None:
             try:
-                sman.deleteSession(sess.sessionCode)
+                app.sman.deleteSession(sess.sessionCode)
 
                 await websocket.close(1000)
             except:

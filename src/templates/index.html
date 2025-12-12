@@ -1,0 +1,556 @@
+<html>
+    <head>
+        <title>Gaze Region Classification</title>
+    </head>
+    <body>
+        <div class="page" id="viewWelcome">
+            <div class="divOuterContainer" id="divWelcome">
+                <button id="btnCreateSession">Session erstellen</button>
+
+                <div class="sessionMngtForm">
+                    <input type="text" id="inpSessionToken" placeholder="6-Zeichen Session Token"></input>
+                    <button id="btnJoinSession">Session beitreten</button>
+                </div>
+            </div>
+        </div>
+        <div class="page" id="viewCodeDisplay">
+            <h1 id="lblCodeDisplay"></h1>
+        </div>
+        <div class="page" id="pageSessionReady">
+            <h1 id="lblSessionReady">Session ready. Press 'Start' to start data collection.</h1>
+
+            <button id="btnStartAll">Starten</button>
+        </div>
+        <div class="page" id="pageStageInterm">
+            <h1 id="lblSessionInterm">Die Sequenz wurde erfolgreich beendet.</h1>
+            Um weiterzumachen, einfach auf "Weiter" tippen.
+            <button id="btnContinue">Weiter</button>
+        </div>
+        <div class="page" id="viewIdle"></div>
+        <div class="page" id="pageShowInstInter">
+            <h1>Anleitung</h1>
+            In der folgenden (fünfminütigen) Sequenz sehen Sie einen roten Ball, der sich innerhalb eines klar
+            abgegrenzten Bereichs hin- und herbounced. Folgen Sie mit ihren Augen diesem Ball. Tun Sie dies bis zum
+            nächsten Bildschirm. Stellen Sie sicher, dass Ihre Augen stets sichtbar und nicht von Haaren oder sonstigen
+            Dingen verdeckt sind.<br>
+            Beim Folgen mit den Augen auch den Kopf mitbewegen.<br><br>
+
+            Tippe auf "Starten", um die Sequenz zu starten.
+            <button id="btnStart">Start</button>
+        </div>
+        <div class="page" id="pageShowInstInterStage4">
+            <h1>Anleitung</h1>
+            In der letzten (zehnminütigen) Sequenz geht es nun darum, NICHT auf den Bildschirm zu schauen. Pausieren
+            funktioniert weiterhin. Kopfbewegen ist ausdrücklich erwünscht. :)<br><br>
+
+            Tippen Sie auf "Starten", um die Sequenz zu starten.
+            <button id="btnStartStage4">Start</button>
+        </div>
+        <div class="page" id="pageCalibration">
+            <h1>Kalibrierung</h1>
+            <button id="btnConfirmCalibration">Fertig</button>
+            <video id="vidCalibration" autoplay></video>
+            <canvas id="canvasCalibration"></canvas>
+        </div>
+        <div class="page" id="pageStage">
+            <canvas id="canvasArea"></canvas>
+        </div>
+        <div class="page" id="pageInterm">
+            <h1 id="h1IntermTitle"></h1>
+            <label id="lblIntermText"></label>
+
+            Klicke auf "Weiter", um zum nächsten Schritt zu gelangen.
+            <button id="btnIntermCont"></button>
+        </div>
+        <div class="page" id="viewFatalError">
+            <h1>Fatal Error</h1>
+            
+            <label id="lblFatalErrorDesc"></label>
+        </div>
+        <div class="page" id="pageFinished">
+            <h1>Fertig!</h1>
+            Die Datenerhebung ist hiermit abgeschlossen. Du kannst nun das Browserfenster auf beiden Geräten schließen
+            oder für einen weiteren Run die Seite neuladen.
+        </div>
+
+        <script type="application/json" id="scrSessionConfig">
+            {{ GL_SESSION_CONFIG | tojson }}
+        </script>
+        <script type="module">
+            import { SessionControl } from '/static/ctrl.js'
+
+            // todo:
+            //  - MUST:
+            //   - refactor the whole thing
+            //    - work out better data layout and not so many fucking globals
+            //    - rework page table to be classes
+            //    - refactor bouncing logic
+            //    - rework HTML to be less redundant
+            //    - make camera shit not be ugly
+            //    - better and more useful calibration screen
+            //    - use some basic layouting-techniques
+            //    - own JS and CSS (not inline)
+            //    - check secure context + better error handling and all that
+            //    - make easier to maintain and edit parameters for customization
+            //    - documentation of execution environment and how it is supposed to be used
+            //     - offload constants to own struct so that they can be changed easily
+            //    - make photo and send async so that the thing isn't lagging
+            //    - use error type and dictionary and print them more prettily
+            //  - OPT:
+            //   - visible timer
+
+            let webSocket      = null  // websocket for comms
+            let roleId         = ''    // ID of this client's role
+            let stageId        = 0     // ID of the current stage
+            let currPage       = null  // currently-active page element
+            let sessCode       = ''    // session code
+            let submIval       = null  // submission interval object
+            //let stream         = null  // video stream
+            let imgCanvas      = null  // canvas used for images
+            let _video         = null  // video stream element
+            let isInCalib      = false // whether or not we are in 'calibration' state
+            let stageStartTime = 0     // starting time of the latest stage
+            let lastPausedTime = 0     // time of the last time we paused
+            //let isPaused       = false // whether or not the data collection is paused
+            let currStage      = null  // current stage element
+            let stageTimeout   = null  // stage timeout object
+            let isInStage      = false // whether or not we are in a stage
+            let currArea       = null
+            let ball           = null
+            
+            //class Ball {
+            //    constructor(area, x, y, radius, color) {
+            //        this.a = area
+            //        this.x = x
+            //        this.y = y
+            //        this.r = radius
+            //        this.c = color
+            //        this.v = 3
+            //        this.p = 45 * (Math.PI / 180)
+            //    }
+//
+            //    update() {
+            //        this.x += Math.cos(this.p) * this.v
+            //        this.y += Math.sin(this.p) * this.v
+//
+            //        let bounced = false
+//
+            //        if (this.x - this.r <= this.a.x) {
+            //            this.x = this.a.x + this.r
+            //            bounced = true
+            //        } else if (this.x + this.r >= this.a.x + this.a.w) {
+            //            this.x = this.a.x + this.a.w - this.r
+            //            bounced = true
+            //        }
+            //    
+            //        if (this.y - this.r <= this.a.y) {
+            //            this.y = this.a.y + this.r
+            //            bounced = true
+            //        } else if (this.y + this.r >= this.a.y + this.a.h) {
+            //            this.y = this.a.y + this.a.h - this.r
+            //            bounced = true
+            //        }
+//
+            //        if (bounced) {
+            //            const min = Math.PI / 6
+            //            const max = Math.PI / 2 + Math.PI / 6
+            //            this.p = Math.random() * (max - min) + min
+            //            if (Math.random() < 0.5) this.p = Math.PI - this.p
+            //            if (Math.random() < 0.5) this.p = -this.p
+            //        }
+            //    }
+//
+            //    draw(ctx) {
+            //        ctx.beginPath()
+            //        {
+            //            ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI)
+//
+            //            ctx.fillStyle = this.c
+            //            ctx.fill()
+            //        }
+            //    }
+            //}
+//
+            //class Area {
+            //    constructor(x = 0, y = 0, width = 0, height = 0, bg = '') {
+            //        this.x = x
+            //        this.y = y
+            //        this.w = width
+            //        this.h = height
+            //        this.c = bg
+            //    }
+//
+            //    draw(ctx) {
+            //        ctx.fillStyle = this.c
+            //        {
+            //            ctx.fillRect(this.x, this.y, this.w, this.h)
+            //        }
+            //    }
+            //}
+
+
+            //stages = {
+            //    'stage0': { 'H': 'pageWelcome',             'L': 'pageWelcome',       'active': '',  'time': 0,  'area': ''  }, // prep, unused
+            //    'stage1': { 'H': 'pageShowInstInter',       'L': 'pageIdle',          'active': '',  'time': 0,  'area': ''  }, // show inst 1
+            //    'stage2': { 'H': 'pageStage',               'L': 'pageIdle',          'active': 'H', 'time': 5,  'area': 'A' },  // coll 1
+            //    'stage3': { 'H': 'pageShowInstInter',       'L': 'pageIdle',          'active': '',  'time': 0,  'area': ''  }, // show inst 2
+            //    'stage4': { 'H': 'pageStage',               'L': 'pageIdle',          'active': 'H', 'time': 5,  'area': 'B' }, // coll 2
+            //    'stage5': { 'H': 'pageIdle',                'L': 'pageShowInstInter', 'active': '',  'time': 0,  'area': ''  }, // show inst 3
+            //    'stage6': { 'H': 'pageIdle',                'L': 'pageStage',         'active': 'L', 'time': 5,  'area': 'C' }, // coll 3
+            //    'stage7': { 'H': 'pageShowInstInterStage4', 'L': 'pageIdle',          'active': '',  'time': 0,  'area': ''  }, // show inst 4
+            //    'stage8': { 'H': 'pageIdle',                'L': 'pageIdle',          'active': 'H', 'time': 10, 'area': ''  }, // coll 4
+            //    'stage9': { 'H': 'pageFinished',            'L': 'pageIdle',          'active': '',  'time': 0,  'area': ''  }  // fini
+            //};
+
+            function switchToPage(pageName) {
+                // Hide the current page.
+                if (currPage != null)
+                    currPage.style.display = 'none'
+
+                // Show the next page.
+                currPage = document.getElementById(pageName)
+                currPage.style.display = 'block'
+            }
+
+            function displayFatalError(text) {
+                let x = document.getElementById('lblFatalErrorDesc')
+
+                x.innerHTML = text
+                switchToPage('pageFatalError')
+            }
+
+            //function takePhoto() {
+            //    // Take photo with front camera.
+            //    cv  = document.getElementById('canvasPhoto')
+            //    vid = document.getElementById('vidCalibration')
+            //    cv.width = vid.videoWidth
+            //    cv.height = vid.videoHeight
+//
+            //    ctx = cv.getContext('2d')
+            //    ctx.drawImage(vid, 0, 0)
+//
+            //    return cv.toDataURL('image/jpeg', 0.9)
+            //}
+
+            function setupWebsocket() {
+                // Open websocket.
+                webSocket = new WebSocket(`wss://${location.host}/ws/${sessCode}/${roleId}`)
+                {
+                    if (webSocket == null) {
+                        console.log("Could not open websocket.")
+
+                        return;
+                    }
+
+                    webSocket.onopen    = wsOnOpen
+                    webSocket.onmessage = wsOnMessage
+                }
+            }
+
+            function wsOnOpen() {
+                webSocket.send(JSON.stringify({ 'message': `hello from role ${roleId}` }))
+            }
+
+            function wsOnMessage(event) {
+                response = JSON.parse(event.data)
+
+                switch (response.command) {
+                    case 'ready':
+                        switchToPage('pageCalibration')
+                        setupCamera('vidCalibration')
+
+                        isInCalib = true
+                        initCalibrationOverlay()
+                        break
+                    case 'start_stage':
+                        currStage = stages[`stage${response.value}`]
+                        {
+                            isInStage = true
+
+                            // Switch page.
+                            switchToPage(currStage[roleId])
+                            if (roleId == currStage.active) {
+                                resizeCanvas()
+
+                                initializeStageElements(currStage.area)
+                                updateStageElements()
+                            }
+
+                            // If interactive, we set a timer for the session end and we also start the interval for the 
+                            // submission of the images.
+                            if (currStage.time != 0) {
+                                // Set timeout timer.
+                                stageTimeout = setTimeout(() => {
+                                    isInStage = false
+
+                                    if (submIval != -1)
+                                        clearInterval(submIval)
+                                    
+                                    if (roleId == currStage.active)
+                                        switchToPage('pageStageInterm')
+                                }, currStage.time * 2 * 1000)
+                                
+                                // Set submission interval, but only for the upper tablet.
+                                if (roleId == GL_SESSION_CONFIG['creatorRole']) {
+                                    submIval = setInterval(async() => {
+                                        const img = takePhoto()
+
+                                        await fetch(`/api/submit/${sessCode}`, {
+                                            method:  'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body:    JSON.stringify({ image: img })
+                                        })
+                                    }, (1.0/4.0)*1000.0)
+                                } else
+                                    submIval = -1
+                            }
+                        }
+                        break
+                    case 'fini':
+                        if (roleId == GL_SESSION_CONFIG['creatorRole'])
+                            stopCamera()
+
+                        break
+                }
+            }
+
+//            async function setupCamera(video) {
+//                _video = document.getElementById(video)
+//
+//                vid = null
+//                if (video != null)
+//                    vid = document.getElementById(video);
+//
+//                try {
+//                    stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1920 },
+//    height: { ideal: 1080 }, facingMode: { ideal: 'user' } } })
+//
+//                    //const track = stream.getVideoTracks()[0];
+//                    //webSocket.send(JSON.stringify({ 'message': track.getCapabilities() }))
+//                    //console.log(track.getCapabilities());
+//
+//                    if (video != null)
+//                        vid.srcObject = stream
+//                } catch (err) {
+//                    webSocket.send(JSON.stringify({ 'message': `Could not access camera. Reason: ${err}.` }))
+//                }
+//            }
+
+//            function stopCamera() {
+//                if (!stream)
+//                    return;
+//
+//                stream.getTracks().forEach(element => element.stop());
+//                stream = null
+//            }
+
+//            function initCalibrationOverlay() {
+//                canvas = document.getElementById('canvasCalibration')
+//
+//                _video.addEventListener('loadedmetadata', () => {
+//                    canvas.width  = 576
+//                    canvas.height = 480
+//
+//                    requestAnimationFrame(drawOverlay)
+//                })
+//            }
+
+//            function drawOverlay() {
+//                if (!isInCalib)
+//                    return;
+//
+//                canvas = document.getElementById('canvasCalibration')
+//                ctx = canvas.getContext('2d')
+//
+//                ctx.drawImage(_video, 0, 0, canvas.width, canvas.height)
+//                ctx.strokeRect(0, 0.25*canvas.height, canvas.width, 0.5*canvas.height)
+//
+//                requestAnimationFrame(drawOverlay)
+//            }
+
+//            function resizeCanvas() {
+//                canvas = document.getElementById('canvasArea')
+//
+//                canvas.width  = window.innerWidth
+//                canvas.height = window.innerHeight
+//            }
+
+//            function initializeStageElements(areaId) {
+//                canvas = document.getElementById('canvasArea')
+//
+//                switch (areaId) {
+//                    case 'A':
+//                        currArea = new Area(0, 0, canvas.width, canvas.height / 2, '#111111')
+//                        ball     = new Ball(currArea, canvas.width / 2, canvas.height / 4, 20, 'yellow')
+//
+//                        break
+//                    case 'B':
+//                        currArea = new Area(0, canvas.height / 2, canvas.width, canvas.height / 2, '#111111')
+//                        ball     = new Ball(currArea, canvas.width / 2, 3 * canvas.height / 4, 20, 'yellow')
+//
+//                        break
+//                    case 'C':
+//                        currArea = new Area(0, 0, canvas.width, canvas.height, '#111111')
+//                        ball     = new Ball(currArea, canvas.width / 2, canvas.height / 2, 20, 'yellow')
+//
+//                        break
+//                }
+//            }
+
+//            function updateStageElements() {
+//                if (!isInStage)
+//                    return
+//
+//                canvas = document.getElementById('canvasArea')
+//                ctx    = canvas.getContext('2d')
+//                {
+//                    ctx.clearRect(0, 0, canvas.width, canvas.height)
+//                    ctx.fillStyle = '#212121'
+//                    ctx.fillRect(0, 0, canvas.width, canvas.height)
+//
+//                    currArea.draw(ctx)
+//                    ball.update()
+//                    ball.draw(ctx)
+//                }
+//
+//                requestAnimationFrame(updateStageElements)
+//            }
+
+//            async function startStage() {
+//                const response = await fetch(`api/advance/${sessCode}`, { method: 'POST' })
+//                const json     = await response.json()
+//
+//                if (json.type == 'error')
+//                    console.error(`Error trying to advance stage. Reason: ${json.desc}`)
+//            }
+
+//            document.getElementById('btnCreateSession').addEventListener('click', async() => {
+//                // Create new session.
+//                const response = await fetch('/api/create', { method: 'POST' })
+//                const data     = await response.json()
+//                
+//                if (data.type == 'ok') {
+//                    // Set state.
+//                    switchToPage('pageCodeDisplay')
+//                    {
+//                        roleId   = 'H'
+//                        sessCode = data.payload.code
+//
+//                        // Show code.
+//                        document.getElementById('lblCodeDisplay').innerHTML = `Code: ${sessCode}`
+//                    }
+//
+//                    // Open websocket.
+//                    setupWebsocket()
+//                }
+//            })
+//
+//            document.getElementById('btnJoinSession').addEventListener('click', async() => {
+//                // Get token from form.
+//                sessCode = document.getElementById('inpSessionToken').value
+//                
+//                if (sessCode != null && sessCode != '') {
+//                    const response = await fetch(`/api/join?code=${sessCode}`, { method: 'POST' })
+//                    const data     = await response.json()
+//
+//                    if (data.type == 'ok') {
+//                        // Set state.
+//                        switchToPage('pageIdle')
+//                        {
+//                            roleId = 'L'
+//                        }
+//
+//                        // Open websocket.
+//                        setupWebsocket()
+//                    }
+//                }
+//            })
+//
+//            document.getElementById('btnStartAll').addEventListener('click', startStage)
+//            document.getElementById('btnStart').addEventListener('click', startStage)
+//            document.getElementById('btnContinue').addEventListener('click', startStage)
+//            document.getElementById('btnStartStage4').addEventListener('click', startStage)
+//
+//            document.getElementById('btnConfirmCalibration').addEventListener('click', () => {
+//                //stopCamera();
+//                isInCalib = false
+//
+//                switchToPage('pageSessionReady')
+//                switchToPage('pageSessionReady')
+//            })
+
+            let ctrl = null
+
+            await (async() => {
+                const [ctrlObj, err] = await SessionControl.Create()
+
+                if (err != null) {
+                    ctrlObj.displayFatalError(err.message)
+
+                    return;
+                }
+                ctrl = ctrlObj
+            })()
+
+            /* Show welcome page so we can create or join a session. */
+            if (ctrl != null)
+                ctrl.switchToView('viewWelcome')
+        </script>
+        <style>
+            html, body {
+                width:            100%;
+                height:           100%;
+                margin:           0;
+                font-family:      Arial, sans-serif;
+                display:          flex;
+                justify-content:  center;
+                align-items:      center;
+                color:            white;
+                background-color: rgb(11, 11, 11);
+            }
+
+            .divOuterContainer {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+                padding: 30px 40px;
+                border-radius: 10px;
+                border-width: 2px;
+                border-color: black;
+                margin: 3px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                background-color: rgb(33, 33 ,33);
+            }
+
+            #lblCouldNotCreateSes, #lblCouldNotJoinSes, #lblEmptyToken {
+                display: none;
+                color:   red;
+            }
+
+            #lblCodeDisplay, h1 {
+                display: block;
+                color: white;
+            }
+
+            #lblSessionReady {
+                display: block;
+                color: green;
+            }
+
+            .page {
+                display: none;
+            }
+
+            #canvasPhoto { 
+                display: none;
+            }
+
+            #vidCalibration {
+                display: none;
+            }
+        </style>
+    </body>
+</html>
+
+

@@ -59,6 +59,7 @@ class BoundingBox:
         self.bottom = min(1080, self.bottom + b)
 
         return self
+    
 
 class FaceParser:
     def __init__(self, rawImgSize: tuple[float, float]):

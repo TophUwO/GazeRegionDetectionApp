@@ -1,0 +1,51 @@
+{
+    "name":        "MtMRegions",
+    "desc":        "main display regions of Match-the-Monkeys",
+    "roleIds":     ["top", "bottom"],
+    "creatorRole": "top",
+    "joinerRole":  "bottom",
+
+    "stages": [
+        {
+            "id":     0,
+            "roleId": "top",
+
+            "region": {
+                "x": 0.0,
+                "y": 0.0,
+                "w": 1.0,
+                "h": 0.75
+            },
+            "time": 180
+        },
+        {
+            "id":     1,
+            "roleId": "top",
+
+            "region": {
+                "x": 0.0,
+                "y": 0.75,
+                "w": 1.0,
+                "h": 0.25
+            },
+            "time": 180
+        },
+        {
+            "id":     2,
+            "roleId": "bottom",
+
+            "region": {
+                "x": 0.0,
+                "y": 0.0,
+                "w": 1.0,
+                "h": 1.0
+            },
+            "time": 180
+        },
+        {
+            "id":   3,
+
+            "time": 180
+        }
+    ]
+}
