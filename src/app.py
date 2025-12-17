@@ -125,10 +125,10 @@ async def advanceStage(code):
     if sess is None:
         return FormatResponse(ResponseStatus.SessionNotFound)
     
-    sess.advanceStage()
-    await sess.sendRole('any', 'start_stage', sess.stageId)
-    if sess.stageId == 9:
-        await sess.sendRole('H', 'fini')
+    # sess.advanceStage()
+    # await sess.sendRole('any', 'start_stage', sess.stageId)
+    # if sess.stageId == 9:
+    #    await sess.sendRole('H', 'fini')
     return FormatResponse(ResponseStatus.Ok)
 
 @app.route('/api/submit/<code>', methods=['POST'])

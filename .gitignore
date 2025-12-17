@@ -3,6 +3,7 @@
 /__pycache__
 /models
 /files
+/py311
 *.pyc
 *.pem
 *.exe

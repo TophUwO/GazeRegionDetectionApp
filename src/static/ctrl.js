@@ -2,14 +2,22 @@ import { ImageSubmitter        } from './imgsubm.js'
 import { SessionWebSocket      } from './ws.js'
 import { CalibrationManagement } from './calib.js'
 
+import { 
+    IntermediateReadyStage,
+    IntermediateEndStage,
+    EndStage,
+    IntermediateInstStage
+} from './interm.js'            
+
 
 /**
  */
 const IntermediateViewType = Object.freeze({
-    READY:        ['READY',        0,  1],
-    CALIBRATION:  ['CALIBRATION',  1,  2],
-    INSTRUCTIONS: ['INSTRUCTIONS', 2, -1],
-    END:          ['END',          3,  2]
+    READY:        [IntermediateReadyStage, 'READY',        0, 'CALIBRATION'  ],
+    CALIBRATION:  [CalibrationManagement,  'CALIBRATION',  1, 'INSTRUCTIONS' ],
+    INSTRUCTIONS: [IntermediateInstStage,  'INSTRUCTIONS', 2, undefined,     ],
+    IEND:         [IntermediateEndStage,   'IEND',         3, 'INSTRUCTIONS' ],
+    END:          [EndStage,               'END',          4, undefined      ]
 })
 
 
@@ -28,6 +36,7 @@ export class SessionControl {
         this.currToken      = null
         this.currIntermView = null
         this.calibMngt      = null
+        this.currIntermObj  = null
 
         try {
             this.initializeInteractiveElements()
@@ -40,15 +49,16 @@ export class SessionControl {
     /**
      */
     initializeInteractiveElements() {
-        const crBtn = document.getElementById('btnCreateSession')
-        const jnBtn = document.getElementById('btnJoinSession')
+        const crBtn  = document.getElementById('btnCreateSession')
+        const jnBtn  = document.getElementById('btnJoinSession')
+        const cntBtn = document.getElementById('btnIntermCont')
 
         /* Create listener for the 'Create session' button in the 'Welcome' view. */
         crBtn.addEventListener('click', async() => {
             const res  = await fetch('/api/create', {
                 method: 'POST'
             })
-            const data = await response.json()
+            const data = await res.json()
 
             if (data.type == 'ok') {
                 this.roleId      = data.payload.role
@@ -122,6 +132,27 @@ export class SessionControl {
             /* Error occurred. */
             this.displayFatalError(data.desc)
         })
+
+        /**
+         */
+        cntBtn.addEventListener('click', async() => {
+            const nextView = SessionControl.GetNextIntermediateView(this.currIntermView)
+
+            /* Do we need to start a stage. */
+            if (nextView == null) {
+                // const res = await fetch('/api/advance', {
+                //     method: 'POST'
+                // })
+                // const data = await res.json()
+
+                // if (res.type !== 'ok')
+                //     this.displayFatalError(data.desc)
+                return
+            }
+
+            /* Only change intermediate view. */
+            this.switchToIntermediateView(nextView)
+        })
     }
 
     /**
@@ -151,24 +182,16 @@ export class SessionControl {
      * @todo intermViewType must be one of the values of 'IntermediateViewType' directly or else it will not match
      */
     switchToIntermediateView(intermViewType) {
-        const cap = document.getElementById('h1IntermCaption')
-        const txt = document.getElementById('lblIntermText')
+        const [cls, id, n, _] = intermViewType
+        {
+            if (this.currIntermObj != null)
+                this.currIntermObj.endIntermediateStage()
 
-        const [id, n, next] = intermViewType
+            this.currIntermObj = new cls(this)
+            this.currIntermObj.startIntermediateStage()
 
-        /* Setup intermediate view. */
-        switch (intermViewType) {
-            case IntermediateViewType.READY:
-                cap.textContent = 'Ready'
-                txt.textContent = 'Session has successfully been initialized. Data collection can now be started.'
-
-                break
-            default:
-                console.error(`Unknown intermediate view type \"${id}\" (${n}).`)
-
-                return
+            this.currIntermView = intermViewType
         }
-        this.currIntermView = intermViewType
 
         /* Switch to the intermediate view. */
         this.switchToView('viewInterm')
@@ -253,17 +276,27 @@ export class SessionControl {
         }
 
         /* Create the calibration management component. */
-        calibMngt = new CalibrationManagement()
-        {
-            if (calibMngt == null)
-                throw new Error('Could not initialize calibration management component.')
-        }
+        //calibMngt = new CalibrationManagement()
+        //{
+        //    if (calibMngt == null)
+        //        throw new Error('Could not initialize calibration management component.')
+        //}
 
         /* All good. Set instance properties. */
         sessCtrl.config       = config
         sessCtrl.imgSubmitter = imgSubmit
 
         return [sessCtrl, null]
+    }
+
+    /**
+     */
+    static GetNextIntermediateView(curr) {
+        const [_, __, next] = curr
+
+        if (next == null)
+            return null
+        return IntermediateViewType[next]
     }
 }
 
