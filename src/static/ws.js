@@ -2,6 +2,9 @@
  */
 export class SessionWebSocket {
     /**
+     * 
+     * @param {*} ctrl 
+     * @param {*} obj 
      */
     constructor(ctrl, obj) {
         this.ctrl  = ctrl
@@ -11,13 +14,16 @@ export class SessionWebSocket {
         }
 
         this.GL_ONMESSAGE_CBTAB = {
-            'Cmd_NewToken': this.ctrl.onNewToken.bind(this.ctrl),
-            'Cmd_Ready':    this.ctrl.onReady.bind(this.ctrl)
+            'Cmd_Ready':      this.ctrl.onReady.bind(this.ctrl),
+            'Cmd_StartStage': this.ctrl.onStartStage.bind(this.ctrl),
+            'Cmd_EndStage':   this.ctrl.onEndStage.bind(this.ctrl)
         }
     }
 
 
     /**
+     * 
+     * @param {*} event 
      */
     onMessage(event) {
         /* Parse message object. If it fails, something is wrong. */
@@ -45,7 +51,23 @@ export class SessionWebSocket {
     }
 
 
+
     /**
+     * 
+     * @param {*} msg 
+     */
+    sendMessage(msg) {
+        this.wsObj.send(JSON.stringify({ 'type': 'msg', 'message': msg }))
+    }
+
+
+
+    /**
+     * 
+     * @param {*} ctrl 
+     * @param {*} role 
+     * @param {*} sessionCode 
+     * @returns 
      */
     static async Create(ctrl, role, sessionCode) {
         /* Connect to websocket. */
@@ -69,7 +91,7 @@ export class SessionWebSocket {
         }
 
         /* Create actual websocket object. */
-        return new SessionControlWebSocket(ctrl, websocketObj)
+        return new SessionWebSocket(ctrl, websocketObj)
     }
 }
 

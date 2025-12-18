@@ -32,18 +32,15 @@ export class IntermediateStage {
     /**
      * 
      */
-    startIntermediateStage() {
-        this.ctrl.switchToView('viewInterm')
-        {
-            this.intermH1.textContent   = this.CAPTION
-            this.intermText.textContent = this.TEXT
-        }
+    startIntermediateStage(...args) {
+        this.intermH1.textContent   = this.CAPTION
+        this.intermText.textContent = this.TEXT
     }
 
     /**
      * 
      */
-    endIntermediateStage() {
+    endIntermediateStage(...args) {
         
     }
 }
@@ -64,7 +61,29 @@ export class IntermediateEndStage extends IntermediateStage  {
  */
 export class EndStage extends IntermediateStage {
     CAPTION = 'Finished'
-    TEXT    = 'You have successfully completed the collection of the training data. Thank you for your cooperation. You can now close this page on all clients or refresh to have another go.'
+    TEXT    = 'You have successfully completed the collection of the training data. Thank you for your cooperation. ' +
+              'You can now close this page on all clients or refresh to have another go.'
+
+    constructor(ctrl) {
+        super(ctrl)
+        this.footer = document.getElementById('divIntermFooter')
+
+        if (this.footer == null)
+            this.ctrlHandle.displayFatalError('Internal Error: Intermediate screen footer could not be found.')
+    }
+
+    startIntermediateStage(...args) {
+        /* Hide all elements that allow for further session control. */
+        this.footer.style.display = 'none'
+
+        super.startIntermediateStage(args)
+    }
+
+    endIntermediateStage(...args) {
+        this.footer.style.display = 'block'
+
+        super.endIntermediateStage(args)
+    }
 }
 
 

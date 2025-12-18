@@ -1,6 +1,7 @@
-import { ImageSubmitter        } from './imgsubm.js'
-import { SessionWebSocket      } from './ws.js'
-import { CalibrationManagement } from './calib.js'
+import { ImageSubmitter               } from './imgsubm.js'
+import { SessionWebSocket             } from './ws.js'
+import { IntermediateCalibrationStage } from './calib.js'
+import { RegionRenderer               } from './regrender.js'
 
 import { 
     IntermediateReadyStage,
@@ -13,11 +14,11 @@ import {
 /**
  */
 const IntermediateViewType = Object.freeze({
-    READY:        [IntermediateReadyStage, 'READY',        0, 'CALIBRATION'  ],
-    CALIBRATION:  [CalibrationManagement,  'CALIBRATION',  1, 'INSTRUCTIONS' ],
-    INSTRUCTIONS: [IntermediateInstStage,  'INSTRUCTIONS', 2, undefined,     ],
-    IEND:         [IntermediateEndStage,   'IEND',         3, 'INSTRUCTIONS' ],
-    END:          [EndStage,               'END',          4, undefined      ]
+    READY:        [IntermediateReadyStage,       'READY',        0, 'CALIBRATION'  ],
+    CALIBRATION:  [IntermediateCalibrationStage, 'CALIBRATION',  1, 'INSTRUCTIONS' ],
+    INSTRUCTIONS: [IntermediateInstStage,        'INSTRUCTIONS', 2, undefined,     ],
+    IEND:         [IntermediateEndStage,         'IEND',         3, 'INSTRUCTIONS' ],
+    END:          [EndStage,                     'END',          4, undefined      ]
 })
 
 
@@ -33,10 +34,11 @@ export class SessionControl {
         this.roleId         = null
         this.sessionCode    = null
         this.websocket      = null
-        this.currToken      = null
         this.currIntermView = null
         this.calibMngt      = null
         this.currIntermObj  = null
+        this.regRender      = null
+        this.currStIdx      = -1
 
         try {
             this.initializeInteractiveElements()
@@ -123,7 +125,7 @@ export class SessionControl {
                 this.sessionCode = data.payload.code
 
                 /* Create websocket. */
-                this.websocket = await SessionWebSocket.Create(this.roleId, this.sessionCode)
+                this.websocket = await SessionWebSocket.Create(this, this.roleId, this.sessionCode)
 
                 this.switchToIdleView()
                 return
@@ -140,13 +142,16 @@ export class SessionControl {
 
             /* Do we need to start a stage. */
             if (nextView == null) {
-                // const res = await fetch('/api/advance', {
-                //     method: 'POST'
-                // })
-                // const data = await res.json()
+                const res = await fetch('/api/advance', {
+                    method:  'POST',
+                    headers: {
+                        'session': this.sessionCode
+                    }
+                })
+                const data = await res.json()
 
-                // if (res.type !== 'ok')
-                //     this.displayFatalError(data.desc)
+                if (data.type !== 'ok')
+                    this.displayFatalError(data.desc)
                 return
             }
 
@@ -188,8 +193,15 @@ export class SessionControl {
                 this.currIntermObj.endIntermediateStage()
 
             this.currIntermObj = new cls(this)
-            this.currIntermObj.startIntermediateStage()
 
+            switch (cls) {
+                case IntermediateCalibrationStage:
+                    this.currIntermObj.startIntermediateStage(this.imgSubmitter.video)
+
+                    break
+                default:
+                    this.currIntermObj.startIntermediateStage()
+            }
             this.currIntermView = intermViewType
         }
 
@@ -197,7 +209,10 @@ export class SessionControl {
         this.switchToView('viewInterm')
     }
 
+
     /**
+     * 
+     * @param {*} reason 
      */
     displayFatalError(reason) {
         const errorLabel = document.getElementById('lblFatalErrorDesc')
@@ -216,17 +231,74 @@ export class SessionControl {
         if (this.calibMngt != null)    this.calibMngt.destroy()
     }
 
-
-    /** 
+    
+    /**
+     * 
+     * @param {*} msgObj 
      */
-    onNewToken(msgObj) {
-        if (msgObj.tok == undefined) {
-            console.error(`Command \"${msgObj.type}\" requires a parameter of name \"tok\".`)
+    onStartStage(msgObj) {
+        this.currStIdx += 1
+        {
+            if (this.currStIdx >= this.config.stages.length) {
+                this.displayFatalError('Internal Error: No more stages left but command to start stage was issued.')
 
+                return
+            }
+
+            this.currStObj = this.config.stages[this.currStIdx]
+
+            /* Start image submitter on creator client. */
+            if (this.roleId == this.config.creatorRole)
+                this.imgSubmitter.startImageSubmitting(this.currStObj.id)
+
+            /* Initialize region renderer on the active client but only if we got a region to render. */
+            if (this.currStObj.region != null && this.currStObj.region.roleId == this.roleId) {
+                this.regRender = new RegionRenderer(this, this.currStObj)
+
+                this.switchToView('viewStage')
+                return
+            }
+        }
+
+        /* On the inactive client, we simply switch to the idle view. */
+        this.switchToIdleView()
+    }
+
+
+    /**
+     * 
+     * @param {*} msgObj 
+     */
+    onEndStage(msgObj) {
+        const activeRole = this.currStObj.region !== undefined ? this.currStIdx.roleId : this.config.creatorRole
+
+        /* Active client must stop renderer. */
+        if (this.roleId === activeRole) {
+            if (this.regRender !== null)
+                this.regRender.endDraw()
+
+            this.regRender = null
+        }
+
+        /* Creator client must display (intermediate) end screen. */
+        if (this.roleId == this.config.creatorRole) {
+            this.imgSubmitter.endImageSubmitting()
+
+            if (this.currStObj === this.config.stages[this.config.stages.length - 1]) {
+                this.switchToIntermediateView(IntermediateViewType.END)
+
+                /* Destroy the session controller. This will also stop the camera. */
+                this.destroy()
+                return
+            }
+
+            this.switchToIntermediateView(IntermediateViewType.IEND)
             return
         }
 
-        this.currToken = msgObj.tok
+        /* Go into idle state on inactive tablet. */
+        this.switchToIdleView()
+        this.destroy()
     }
 
     /**
@@ -244,7 +316,6 @@ export class SessionControl {
     static async Create() {
         let config
         let imgSubmit
-        let calibMngt
 
         /* Create session control. */
         const sessCtrl = new SessionControl()
@@ -266,21 +337,14 @@ export class SessionControl {
         }
 
         /* Create image submitter component. */
-        imgSubmit = await ImageSubmitter.Create(1920, 1080)
+        imgSubmit = await ImageSubmitter.Create(sessCtrl, 1920, 1080, config.ival)
         {
-            if (imgSubmit == null);
-                //throw new Error(
-                //    'Could not initialize image submitter component. Perhaps no camera is installed or the ' +
-                //    'application is not allowed to use it.'
-                //)
+            if (imgSubmit == null)
+                throw new Error(
+                    'Could not initialize image submitter component. Perhaps no camera is installed or the ' +
+                    'application is not allowed to use it.'
+                )
         }
-
-        /* Create the calibration management component. */
-        //calibMngt = new CalibrationManagement()
-        //{
-        //    if (calibMngt == null)
-        //        throw new Error('Could not initialize calibration management component.')
-        //}
 
         /* All good. Set instance properties. */
         sessCtrl.config       = config
@@ -290,11 +354,14 @@ export class SessionControl {
     }
 
     /**
+     * 
+     * @param {*} curr 
+     * @returns 
      */
     static GetNextIntermediateView(curr) {
-        const [_, __, next] = curr
+        const [_, __, ___, next] = curr
 
-        if (next == null)
+        if (next == undefined)
             return null
         return IntermediateViewType[next]
     }

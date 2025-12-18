@@ -4,66 +4,77 @@
     "roleIds":     ["top", "bottom"],
     "creatorRole": "top",
     "joinerRole":  "bottom",
+    "ival":        250,
 
     "stages": [
         {
             "id":   0,
             "desc": "",
             "inst": {
-                "roleId": "top",
-                "text":   ""
+                "text": ""
             },
 
             "region": {
-                "x": 0.0,
-                "y": 0.0,
-                "w": 1.0,
-                "h": 0.75
+                "roleId": "top",
+                "left":   0.0,
+                "top":    0.0,
+                "right":  1.0,
+                "bottom": 0.75,
+                "color":  "#111111",
+                "objcol": "yellow",
+                "objrad": 20
             },
-            "time": 180
+            "time":  5,
+            "speed": 5
         },
         {
             "id":   1,
             "desc": "",
             "inst": {
-                "roleId": "top",
-                "text":   ""
+                "text": ""
             },
 
             "region": {
-                "x": 0.0,
-                "y": 0.75,
-                "w": 1.0,
-                "h": 0.25
+                "roleId": "top",
+                "left":   0.0,
+                "top":    0.75,
+                "right":  1.0,
+                "bottom": 1.0,
+                "color":  "#111111",
+                "objcol": "yellow",
+                "objrad": 20
             },
-            "time": 180
+            "time":  5,
+            "speed": 5
         },
         {
             "id":   2,
             "desc": "",
             "inst": {
-                "roleId": "bottom",
-                "text":   ""
+                "text": ""
             },
 
             "region": {
                 "roleId": "bottom",
-                "x":      0.0,
-                "y":      0.0,
-                "w":      1.0,
-                "h":      1.0
+                "left":   0.0,
+                "top":    0.0,
+                "right":  1.0,
+                "bottom": 1.0,
+                "color":  "#111111",
+                "objcol": "yellow",
+                "objrad": 20
             },
-            "time": 180
+            "time":  5,
+            "speed": 5
         },
         {
             "id":   3,
             "desc": "",
             "inst": {
-                "roleId": "top",
-                "text":   ""
+                "text": ""
             },
 
-            "time": 180
+            "time": 10
         }
     ]
 }

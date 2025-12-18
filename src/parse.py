@@ -53,13 +53,29 @@ class BoundingBox:
     def pad(self, extra: BoundingBox | tuple[float, float, float, float]) -> BoundingBox:
         l, t, r, b = extra
 
-        self.left  = max(0,     self.left   - l)
-        self.top   = max(0,     self.top    - t)
-        self.right = min(1920,  self.right  + r)
+        self.left   = max(0,     self.left   - l)
+        self.top    = max(0,     self.top    - t)
+        self.right  = min(1920,  self.right  + r)
         self.bottom = min(1080, self.bottom + b)
 
         return self
     
+
+class LabelGenerator:
+    @staticmethod
+    def GenerateLabel(rawimg, code, index, region, x, y, ts) -> str:
+        return f'''
+            {{
+                "image":  "{rawimg}",
+                "code":   "{code}",
+                "index":  {index},
+                "region": {region},
+                "x":      {x},
+                "y":      {y},
+                "time":   {ts}
+            }}
+        '''
+
 
 class FaceParser:
     def __init__(self, rawImgSize: tuple[float, float]):

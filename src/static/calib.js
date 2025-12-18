@@ -4,27 +4,21 @@ import { IntermediateStage } from "./interm.js"
 /**
  * 
  */
-export class CalibrationManagement extends IntermediateStage {
+export class IntermediateCalibrationStage extends IntermediateStage {
     isInCalib   = false
     frameHandle = -1
     cvHandle    = document.getElementById('canvCalibrationOverlay')
     srcVideo    = null
 
-    HEADING     = 'Calibration'
-    TEXT        = 'This application requires the person in front of the screen to position themselves so that the entire face sits comfortably in the red box. Inside this box, movement is permitted and explicitly encouraged.'
-
-    /**
-     * 
-     */
-    constructor(ctrl, srcVideo) {
-        super(ctrl)
-
-        this.srcVideo = srcVideo
-    }
+    CAPTION     = 'Calibration'
+    TEXT        = 'This application requires the person in front of the screen to position themselves so that the ' + 
+                  'entire face sits comfortably in the red box. Inside this box, movement is permitted and explicitly ' +
+                  'encouraged.'
 
     /**
      */
-    startIntermediateStage() {
+    startIntermediateStage(srcVideo) {
+        this.srcVideo  = srcVideo
         this.isInCalib = true
         {
             this.elemCont.style.display = 'block'
@@ -41,17 +35,17 @@ export class CalibrationManagement extends IntermediateStage {
     /**
      * 
      */
-    endIntermediateStage(nextView) {
+    endIntermediateStage() {
+        this.isInCalib = false
         cancelAnimationFrame(this.frameHandle)
 
         this.elemCont.style.display = 'none'
         
-        this.isInCalib   = false
         this.frameHandle = -1
         this.ctrlHandle  = null
         this.srcVideo    = null
 
-        super.endIntermediateStage(nextView)
+        super.endIntermediateStage()
     }
 
     /**

@@ -1,12 +1,16 @@
-from __future__            import annotations
-from quart                 import Quart, Response, render_template, request, websocket
-from session               import *
-from error                 import ResponseStatus, FormatResponse
-from parse                 import FaceParser
-from json                  import loads
-from base64                import *
-from os                    import getenv
-from jsonschema            import validate
+from __future__ import annotations
+from quart      import Quart, Response, render_template, request, websocket
+from session    import *
+from error      import ResponseStatus, FormatResponse
+from parse      import FaceParser, LabelGenerator
+from json       import loads
+from os         import getenv
+from jsonschema import validate
+
+
+# TODO: document the fuck out of this
+# TODO: show insts given in config
+# TODO: process images
 
 
 class DataCollectionApp(Quart):
@@ -63,7 +67,7 @@ class DataCollectionApp(Quart):
             exit(1)
 
         # Initialize sub-components.
-        self.sman   = SessionManager()
+        self.sman   = SessionManager(config=self._cfgDict)
         self.parser = FaceParser((1920, 1080))
 
         print('info: Initialized application. Ready.')
@@ -93,12 +97,13 @@ async def createSession():
     # TODO: can fail
     sess = app.sman.createSession()
 
-    print(f'[SESS#{sess.sessionCode}] Opened session.')
+    print(f'[SESS#{sess.code}] Opened session.')
 
     # Return session code.
     return FormatResponse(ResponseStatus.Ok, { 
-        'code': sess.sessionCode,
-        'role': app._cfgDict['creatorRole']
+        'code':  sess.code,
+        'role':  app._cfgDict['creatorRole'],
+        'token': sess.token
     })
 
 @app.route('/api/join', methods=['POST'])
@@ -113,90 +118,104 @@ async def joinSession():
         return FormatResponse(ResponseStatus.SessionNotFound)
     
     # All good.
-    # await sess.sendRole('H', 'ready')
+    await sess.sendCommand(app._cfgDict['creatorRole'], 'Cmd_Ready')
     return FormatResponse(ResponseStatus.Ok, {
-        'code': sess.sessionCode,
+        'code': sess.code,
         'role': app._cfgDict['joinerRole']
     })
 
-@app.route('/api/advance/<code>', methods=['POST'])
-async def advanceStage(code):
+@app.route('/api/advance', methods=['POST'])
+async def advanceStage():
+    code = request.headers.get('session', type=str, default=None)
+    if code is None:
+        return FormatResponse(ResponseStatus.InvalidSessionToken)
+
     sess = app.sman.getSession(code)
     if sess is None:
         return FormatResponse(ResponseStatus.SessionNotFound)
-    
-    # sess.advanceStage()
-    # await sess.sendRole('any', 'start_stage', sess.stageId)
-    # if sess.stageId == 9:
-    #    await sess.sendRole('H', 'fini')
+
+    if not sess.gotoNextStage():
+        return FormatResponse(ResponseStatus.InvalidStage)
+
+    await sess.sendCommand('any', 'Cmd_StartStage')
     return FormatResponse(ResponseStatus.Ok)
 
-@app.route('/api/submit/<code>', methods=['POST'])
-async def saveImage(code):
+@app.route('/api/submit', methods=['POST'])
+async def saveImage():
+    code = request.headers.get('session', type=str, default=None)
+    if code is None:
+        return FormatResponse(ResponseStatus.InvalidSessionToken)
+
     sess = app.sman.getSession(code)
     if sess is None:
         return FormatResponse(ResponseStatus.SessionNotFound)
     elif not sess.stage.canSupply:
         return FormatResponse(ResponseStatus.CannotSupplyImages)
-    
-    data = await request.get_json()
-    image_data = data["image"]
 
-    # Remove "data:image/jpeg;base64," prefix if present
-    if image_data.startswith("data:image"):
-        header, image_data = image_data.split(",", 1)
+    # Parse request.
+    form   = None
+    img    = None
+    index  = -1
+    region = -1
+    time   = -1
+    x      = -1
+    y      = -1
+    try:
+        form   = await request.form
+        img    = (await request.files)['image']
 
-    # Decode base64
-    image_bytes = b64decode(image_data)
+        x      = int(form['objX'])
+        y      = int(form['objY'])
+        index  = int(form['index'])
+        region = int(form['region'])
+        time   = int(form['time'])
+    except Exception as err:
+        return FormatResponse(ResponseStatus.MalformedRequest)
 
-    # Save to file
-    with open(f"files/raw/{code}/raw_{code}_{sess.stageId}_{sess.idx}.jpg", "wb") as f:
-        f.write(image_bytes)
-    sess.idx += 1
+    # Save and process.
+    imgPath = f'files/raw/{code}/img_{code}_{region}_{index}.png'
+    lblPath = f'files/raw/{code}/lbl_{code}_{region}_{index}.json'
 
-    # TODO: make it so that this runs in a worker thread
-    await app.parser.processRawImage(image_bytes, code, sess.stageId, sess.idx)
+    sess.setLastIndex(index)
+    with open(lblPath, 'w') as labelFile:
+        labelFile.write(LabelGenerator.GenerateLabel(imgPath, code, index, region, x, y, time))
+    await img.save(imgPath)
+
+    # # TODO: make it so that this runs in a worker thread
+    # await app.parser.processRawImage(image_bytes, code, sess.stageId, sess.idx)
     return FormatResponse(ResponseStatus.Ok)
 
 
 @app.websocket('/ws/<code>/<role>')
 async def handleWebsocket(code, role):
-    # Get session.
     sess = app.sman.getSession(code)
     if sess is None or role not in app._cfgDict['roleIds']:
-        await websocket.close()
+        await websocket.close(1000)
 
-    # Set the websocket connection.
-    ws = websocket._get_current_object()
-    if   role == app._cfgDict.get('creatorRole'): sess.tabs.upper = ws
-    elif role == app._cfgDict.get('joinerRole'):  sess.tabs.lower = ws
-
-    print(f'[SESS#{sess.sessionCode}] Opened WebSocket for role \'{role}\'.')
+    print(f'[SESS#{sess.code}] Opened WebSocket for role \'{role}\'.')
 
     # Run loop.
+    sess.registerClient(role, websocket._get_current_object())
     try:
         while True:
             data = await websocket.receive_json()
 
             match data['type']:
                 case 'msg':
-                    print(f'[SESS#{sess.sessionCode}] Received JSON from role \'{role}\': {data}')
+                    print(f'[SESS#{sess.code}] Received JSON from role \'{role}\': {data}')
     except:
-        print(f'[SESS#{sess.sessionCode}] Closed WebSocket for role {role}.')
-
-        # Remove the ws.
-        if   role == app._cfgDict.get('creatorRole'): sess.tabs.upper = None
-        elif role == app._cfgDict.get('joinerRole'):  sess.tabs.lower = None
+        print(f'[SESS#{sess.code}] Closed WebSocket for role {role}.')
 
         # Delete session if both sockets are None.
-        if sess.tabs.upper is None and sess.tabs.lower is None:
+        sess.unregisterClient(role)
+        if sess.isEmpty():
             try:
-                app.sman.deleteSession(sess.sessionCode)
+                app.sman.deleteSession(sess.code)
 
                 await websocket.close(1000)
             except:
                 pass
 
-            print(f'[SESS#{sess.sessionCode}] Closed session.')
+            print(f'[SESS#{sess.code}] Closed session.')
 
 

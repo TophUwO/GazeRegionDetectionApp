@@ -1,11 +1,87 @@
+/**
+ */
 export class ImageSubmitter {
-    constructor(canvas, stream, video) {
-        this.canvas = canvas
-        this.stream = stream
-        this.video  = video
+    /**
+     * 
+     * @param {*} ctrl 
+     * @param {*} canvas 
+     * @param {*} stream 
+     * @param {*} video 
+     * @param {*} ival 
+     */
+    constructor(ctrl, canvas, stream, video, ival) {
+        this.ctrl     = ctrl
+        this.canvas   = canvas
+        this.stream   = stream
+        this.video    = video
+        this.submIval = -1
+        this.ival     = ival
+        this.stageId  = -1
+
+        /* Create worker thread for image creation. This is so that the ball does not lag due to image processing. */
+        this.worker = new Worker('./static/imgmk.js')
     }
 
-    static async Create(imgWidth, imgHeight) {
+
+    /**
+     * 
+     * @param {*} stageId 
+     */
+    startImageSubmitting(stageId) {
+        this.submIdx  = 0
+        this.stageId  = stageId
+        this.submIval = setInterval(this.submitImage.bind(this), this.ival)
+    }
+
+    /**
+     * 
+     */
+    endImageSubmitting() {
+        if (this.submIval != -1)
+            clearInterval(this.submIval)
+
+        this.stageId  = -1
+        this.submIval = -1
+    }
+
+    /**
+     */
+    destroy() {
+        if (!this.stream)
+            return
+
+        this.stream.getTracks().forEach(element => element.stop());
+        this.endImageSubmitting()
+    }
+
+
+    /**
+     * 
+     */
+    submitImage() {
+        createImageBitmap(this.video).then(bmp => {
+            this.worker.postMessage({
+                bmp,
+                idx:    this.submIdx++,
+                ballX:  -1,
+                ballY:  -1,
+                code:   this.ctrl.sessionCode,
+                region: this.stageId,
+                time:   Date.now()
+            }, [bmp])
+        })
+    }
+
+
+    /**
+     * 
+     * @param {*} ctrl 
+     * @param {*} imgWidth 
+     * @param {*} imgHeight 
+     * @param {*} ival 
+     * @returns 
+     */
+    static async Create(ctrl, imgWidth, imgHeight, ival) {
         let stream
 
         const canvas = document.createElement('canvas')
@@ -19,7 +95,8 @@ export class ImageSubmitter {
                         height:     { ideal: imgHeight },
                         facingMode: { 
                             ideal: 'user'
-                        }
+                        },
+                        frameRate: Math.trunc(1000.0 / ival) + 1.0
                     }
                 })
                 video.srcObject = stream
@@ -29,7 +106,7 @@ export class ImageSubmitter {
             } catch (err) {
                 console.log(`Could not access camera. Reason: ${err}.`)
 
-                return null
+                //return null
             }
 
             /* Set the size of the canvas to the actual video stream dimensions. */
@@ -37,23 +114,7 @@ export class ImageSubmitter {
             canvas.height = video.videoHeight
         }
 
-        return new ImageSubmitter(canvas, stream, video)
-    }
-
-    async submitImage() {
-        ctx = this.canvas.getContext('2d')
-        {
-            ctx.drawImage(this.video, 0, 0)
-        }
-
-        return this.canvas.toDataURL('image/jpeg', 0.9)
-    }
-
-    destroy() {
-        if (!this.stream)
-            return
-
-        this.stream.getTracks().forEach(element => element.stop());
+        return new ImageSubmitter(ctrl, canvas, stream, video, ival)
     }
 }
 
