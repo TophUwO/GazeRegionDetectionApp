@@ -102,8 +102,7 @@ async def createSession():
     # Return session code.
     return FormatResponse(ResponseStatus.Ok, { 
         'code':  sess.code,
-        'role':  app._cfgDict['creatorRole'],
-        'token': sess.token
+        'role':  app._cfgDict['creatorRole']
     })
 
 @app.route('/api/join', methods=['POST'])

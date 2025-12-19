@@ -244,7 +244,6 @@ export class SessionControl {
 
                 return
             }
-
             this.currStObj = this.config.stages[this.currStIdx]
 
             /* Start image submitter on creator client. */
@@ -256,6 +255,7 @@ export class SessionControl {
                 this.regRender = new RegionRenderer(this, this.currStObj)
 
                 this.switchToView('viewStage')
+                this.regRender.beginDraw()
                 return
             }
         }
@@ -270,21 +270,22 @@ export class SessionControl {
      * @param {*} msgObj 
      */
     onEndStage(msgObj) {
-        const activeRole = this.currStObj.region !== undefined ? this.currStIdx.roleId : this.config.creatorRole
-
         /* Active client must stop renderer. */
-        if (this.roleId === activeRole) {
-            if (this.regRender !== null)
+        if (this.regRender != null) {
+            const activeRole = this.currStObj.region != null ? this.currStObj.region.roleId : this.config.creatorRole
+
+            if (this.roleId == activeRole) {
                 this.regRender.endDraw()
 
-            this.regRender = null
+                this.regRender = null
+            }
         }
 
         /* Creator client must display (intermediate) end screen. */
         if (this.roleId == this.config.creatorRole) {
             this.imgSubmitter.endImageSubmitting()
 
-            if (this.currStObj === this.config.stages[this.config.stages.length - 1]) {
+            if (this.currStObj == this.config.stages[this.config.stages.length - 1]) {
                 this.switchToIntermediateView(IntermediateViewType.END)
 
                 /* Destroy the session controller. This will also stop the camera. */

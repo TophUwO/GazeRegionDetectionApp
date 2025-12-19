@@ -2,13 +2,14 @@
  */
 export class RegionRenderer {
     constructor(ctrl, config) {
-        this.ctrl   = ctrl
-        this.cfg    = config
-        this.isDraw = true
+        this.ctrl      = ctrl
+        this.cfg       = config
+        this.isDraw    = false
+        this.startTime = -1
         {
             /* Create the ball in the middle of the region. */
             this.ball = new Ball(
-                this,
+                this.cfg.region,
                 (this.cfg.region.left + (this.cfg.region.right  - this.cfg.region.left) * 0.5) * window.innerWidth,
                 (this.cfg.region.top  + (this.cfg.region.bottom - this.cfg.region.top)  * 0.5) * window.innerHeight,
                 this.cfg.region.objrad,
@@ -20,7 +21,6 @@ export class RegionRenderer {
                 this.cvArea.width  = window.innerWidth
                 this.cvArea.height = window.innerHeight
             }
-            this.frame = requestAnimationFrame(this.draw.bind(this))
         }
     }
 
@@ -47,16 +47,53 @@ export class RegionRenderer {
                 (this.cfg.region.bottom - this.cfg.region.top)  * this.cvArea.height
             )
             this.ball.draw(ctx, this.cfg.region.objcol)
+
+            /* Draw timer inside the current region. */
+            const currTime = Date.now() / 1000
+            {
+                const remMins = Math.trunc((this.cfg.time - (currTime - this.startTime)) / 60)
+                const remSecs = Math.trunc((this.cfg.time - (currTime - this.startTime)) % 60)
+                const remTime = `${String(remMins).padStart(2, '0')}:${String(remSecs).padStart(2, '0')}`
+
+                ctx.fillStyle = 'white'
+                ctx.font      = '36px monospace'
+                {
+                    const txtMetrics = ctx.measureText(remTime)
+                    const txtWidth   = txtMetrics.width
+                    const txtHeight  = txtMetrics.actualBoundingBoxAscent + txtMetrics.actualBoundingBoxDescent
+                    const boxWidth   = (this.cfg.region.right  - this.cfg.region.left) * this.cvArea.width
+                    const boxHeight  = (this.cfg.region.bottom - this.cfg.region.top)  * this.cvArea.height
+
+                    ctx.fillText(
+                        remTime,
+                        this.cfg.region.left * this.cvArea.width + (boxWidth  - txtWidth)  / 2.0,
+                        this.cfg.region.top * this.cvArea.height + (boxHeight - txtHeight) / 2.0
+                    )
+                }
+            }
         }
 
         this.frame = requestAnimationFrame(this.draw.bind(this))
     }
 
     /**
+     * 
+     */
+    beginDraw() {
+        if (this.isDraw != true) {
+            this.isDraw    = true
+            this.startTime = Date.now() / 1000
+
+            this.frame = requestAnimationFrame(this.draw.bind(this))
+        }
+    }
+
+    /**
      */
     endDraw() {
-        cancelAnimationFrame(this.frame)
-        {
+        if (this.isDraw != false) {
+            cancelAnimationFrame(this.frame)
+            
             this.isDraw = false
             this.frame  = -1
         }
@@ -77,19 +114,31 @@ class Ball {
         this.x   = startX
         this.y   = startY
         this.r   = radius
-        this.v   = speed
         this.reg = region
-        this.p   = 0.1
+        this.vx  = speed
+        this.vy  = speed
     }
 
 
     /**
      */
     move() {
-        this.x += Math.cos(this.p) * this.v
-        this.y += Math.sin(this.p) * this.v
+        /* Update position. */
+        this.x += this.vx
+        this.y += this.vy
 
-        // TODO: bounce ball
+        /* Check if we bounced on any side. */
+        const left   = this.reg.left   * window.innerWidth
+        const top    = this.reg.top    * window.innerHeight
+        const right  = this.reg.right  * window.innerWidth
+        const bottom = this.reg.bottom * window.innerHeight
+
+        /* Have we bounced left or right side? */
+        if (this.x - this.r <= left || this.x + this.r >= right)
+            this.vx = -this.vx
+        /* Have we bounced top or bottom side? */
+        if (this.y - this.r <= top || this.y + this.r >= bottom)
+            this.vy = -this.vy
     }
 
     /**
