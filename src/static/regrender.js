@@ -55,19 +55,15 @@ export class RegionRenderer {
                 const remSecs = Math.trunc((this.cfg.time - (currTime - this.startTime)) % 60)
                 const remTime = `${String(remMins).padStart(2, '0')}:${String(remSecs).padStart(2, '0')}`
 
-                ctx.fillStyle = 'white'
-                ctx.font      = '36px monospace'
+                ctx.fillStyle    = 'white'
+                ctx.font         = '36px monospace'
+                ctx.textAlign    = 'center'
+                ctx.textBaseline = 'middle'
                 {
-                    const txtMetrics = ctx.measureText(remTime)
-                    const txtWidth   = txtMetrics.width
-                    const txtHeight  = txtMetrics.actualBoundingBoxAscent + txtMetrics.actualBoundingBoxDescent
-                    const boxWidth   = (this.cfg.region.right  - this.cfg.region.left) * this.cvArea.width
-                    const boxHeight  = (this.cfg.region.bottom - this.cfg.region.top)  * this.cvArea.height
-
                     ctx.fillText(
                         remTime,
-                        this.cfg.region.left * this.cvArea.width + (boxWidth  - txtWidth)  / 2.0,
-                        this.cfg.region.top * this.cvArea.height + (boxHeight - txtHeight) / 2.0
+                        (this.cfg.region.left + (this.cfg.region.right  - this.cfg.region.left) * 0.5) * window.innerWidth,
+                        (this.cfg.region.top  + (this.cfg.region.bottom - this.cfg.region.top)  * 0.5) * window.innerHeight
                     )
                 }
             }
