@@ -106,7 +106,7 @@ export class ImageSubmitter {
             } catch (err) {
                 console.log(`Could not access camera. Reason: ${err}.`)
 
-                //return null
+                return null
             }
 
             /* Set the size of the canvas to the actual video stream dimensions. */

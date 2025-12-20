@@ -95,6 +95,10 @@ export class RegionRenderer {
             this.frame  = -1
         }
     }
+
+    destroy() {
+        this.endDraw()
+    }
 }
 
 
@@ -129,13 +133,33 @@ class Ball {
         const top    = this.reg.top    * window.innerHeight
         const right  = this.reg.right  * window.innerWidth
         const bottom = this.reg.bottom * window.innerHeight
+        
+        const didHitX   = this.x - this.r <= left || this.x + this.r >= right
+        const didHitY   = this.y - this.r <= top  || this.y + this.r >= bottom
 
-        /* Have we bounced left or right side? */
-        if (this.x - this.r <= left || this.x + this.r >= right)
-            this.vx = -this.vx
-        /* Have we bounced top or bottom side? */
-        if (this.y - this.r <= top || this.y + this.r >= bottom)
-            this.vy = -this.vy
+        /* In order to cover more ground, we must randomize the angle of reflection a bit. Our max. deviation is ±15°. */
+        const deviation = (Math.random() - 0.5) * (Math.PI / 6)
+
+        /* Before we bounce, we clip the ball into the box so it does not cause funny visual glitches. */
+        if (this.x - this.r < left)   this.x = left   + this.r
+        if (this.x + this.r > right)  this.x = right  - this.r
+        if (this.y - this.r < top)    this.y = top    + this.r
+        if (this.y + this.r > bottom) this.y = bottom - this.r
+
+        let speed = Math.hypot(this.vx, this.vy)
+        let angle = Math.atan2(this.vy, this.vx)
+        {
+            if (didHitX && !didHitY)
+                angle = Math.PI - angle + deviation
+            else if (didHitY && !didHitX)
+                angle = -angle + deviation
+            else if (didHitX && didHitY)
+                angle = angle + Math.PI
+        }
+
+        /* Update the velocity vector. */
+        this.vx = Math.cos(angle) * speed
+        this.vy = Math.sin(angle) * speed
     }
 
     /**

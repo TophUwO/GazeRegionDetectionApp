@@ -35,7 +35,6 @@ export class SessionControl {
         this.sessionCode    = null
         this.websocket      = null
         this.currIntermView = null
-        this.calibMngt      = null
         this.currIntermObj  = null
         this.regRender      = null
         this.currStIdx      = -1
@@ -228,7 +227,10 @@ export class SessionControl {
      */
     destroy() {
         if (this.imgSubmitter != null) this.imgSubmitter.destroy()
-        if (this.calibMngt != null)    this.calibMngt.destroy()
+        if (this.regRender    != null) this.regRender.destroy()
+
+        if (this.websocket != null)
+            this.websocket.close()
     }
 
     
@@ -236,7 +238,7 @@ export class SessionControl {
      * 
      * @param {*} msgObj 
      */
-    onStartStage(msgObj) {
+    async onStartStage(msgObj) {
         this.currStIdx += 1
         {
             if (this.currStIdx >= this.config.stages.length) {
@@ -269,7 +271,7 @@ export class SessionControl {
      * 
      * @param {*} msgObj 
      */
-    onEndStage(msgObj) {
+    async onEndStage(msgObj) {
         /* Active client must stop renderer. */
         if (this.regRender != null) {
             const activeRole = this.currStObj.region != null ? this.currStObj.region.roleId : this.config.creatorRole
@@ -288,8 +290,6 @@ export class SessionControl {
             if (this.currStObj == this.config.stages[this.config.stages.length - 1]) {
                 this.switchToIntermediateView(IntermediateViewType.END)
 
-                /* Destroy the session controller. This will also stop the camera. */
-                this.destroy()
                 return
             }
 
@@ -297,18 +297,47 @@ export class SessionControl {
             return
         }
 
-        /* Go into idle state on inactive tablet. */
+        /* Go into idle state on inactive client. */
         this.switchToIdleView()
-        this.destroy()
     }
 
     /**
      */
-    onReady() {
+    async onReady() {
         if (this.roleId != this.config.creatorRole)
             return
 
         this.switchToIntermediateView(IntermediateViewType.READY)
+
+        /* Create image submitter component. */
+        this.imgSubmitter = await ImageSubmitter.Create(this, 1920, 1080, this.config.ival)
+        {
+            if (this.imgSubmitter == null) {
+                this.websocket.sendMessage('Msg_CamFailed')
+
+                this.displayFatalError(
+                    'Could not initialize image submitter component. Perhaps no camera is installed or the ' +
+                    'application is not allowed to use it.'
+                )
+            }
+        }
+    }
+
+    /**
+     * 
+     */
+    async onEndSession() {
+        this.destroy()
+    }
+
+    /**
+     * 
+     */
+    async onCameraError() {
+        this.displayFatalError(
+            'Could not initialize camera. Please look at the client initializing the camera to view extended error ' +
+            'information.'
+        )
     }
 
 
@@ -316,7 +345,6 @@ export class SessionControl {
      */
     static async Create() {
         let config
-        let imgSubmit
 
         /* Create session control. */
         const sessCtrl = new SessionControl()
@@ -337,19 +365,8 @@ export class SessionControl {
             config = JSON.parse(cfg.textContent)
         }
 
-        /* Create image submitter component. */
-        imgSubmit = await ImageSubmitter.Create(sessCtrl, 1920, 1080, config.ival)
-        {
-            if (imgSubmit == null)
-                throw new Error(
-                    'Could not initialize image submitter component. Perhaps no camera is installed or the ' +
-                    'application is not allowed to use it.'
-                )
-        }
-
         /* All good. Set instance properties. */
-        sessCtrl.config       = config
-        sessCtrl.imgSubmitter = imgSubmit
+        sessCtrl.config = config
 
         return [sessCtrl, null]
     }

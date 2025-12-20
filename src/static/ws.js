@@ -14,7 +14,9 @@ export class SessionWebSocket {
         this.GL_ONMESSAGE_CBTAB = {
             'Cmd_Ready':      this.ctrl.onReady.bind(this.ctrl),
             'Cmd_StartStage': this.ctrl.onStartStage.bind(this.ctrl),
-            'Cmd_EndStage':   this.ctrl.onEndStage.bind(this.ctrl)
+            'Cmd_EndStage':   this.ctrl.onEndStage.bind(this.ctrl),
+            'Cmd_EndSession': this.ctrl.onEndSession.bind(this.ctrl),
+            'Cmd_CamError':   this.ctrl.onCameraError.bind(this.ctrl)
         }
     }
 
@@ -23,7 +25,7 @@ export class SessionWebSocket {
      * 
      * @param {*} event 
      */
-    onMessage(event) {
+    async onMessage(event) {
         /* Parse message object. If it fails, something is wrong. */
         let msgObj = null
         try {
@@ -42,12 +44,11 @@ export class SessionWebSocket {
             else if (typeof callback !== 'function')
                 throw new Error(`Command \"${msgObj.command}\" is misconfigured (callback is not a function.`)
 
-            callback(msgObj)
+            await callback(msgObj)
         } catch (err) {
             console.log(`Error while processing command \"${msgObj.command}\". Description: ${err}`)
         }
     }
-
 
 
     /**
@@ -55,13 +56,26 @@ export class SessionWebSocket {
      * @param {*} msg 
      */
     sendMessage(msg) {
-        if (this.wsObj?.readyState !== WebSocket.OPEN) {
+        if (this.wsObj?.readyState != WebSocket.OPEN) {
             console.warn('WebSocket is not open. Not sending message.')
 
             return
         }
 
         this.wsObj.send(JSON.stringify({ 'type': 'msg', 'message': msg }))
+    }
+
+    /**
+     * 
+     */
+    close() {
+        if (this.wsObj?.readyState != WebSocket.OPEN) {
+            console.warn('WebSocket is not open. Cannot close.')
+
+            return
+        }
+
+        this.wsObj.close(1000)
     }
 
 

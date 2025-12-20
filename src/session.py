@@ -107,6 +107,8 @@ class Session:
 
         print(f'[SESS#{self.code}] Finished stage {self.config["stages"][self.stage.id]["id"]}.')
         if self.stage.id == self.config['stages'][len(self.config['stages']) - 1]['id']:
+            await self.sendCommand('any', 'Cmd_EndSession')
+
             print(f'[SESS#{self.code}] Finished session #{self.code}.')
         await self.sendCommand('any', 'Cmd_EndStage')
 

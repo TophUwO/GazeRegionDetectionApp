@@ -202,6 +202,9 @@ async def handleWebsocket(code, role):
             match data['type']:
                 case 'msg':
                     print(f'[SESS#{sess.code}] Received JSON from role \'{role}\': {data}')
+
+                    if data['message'] == 'Msg_CamFailed':
+                        await sess.sendCommand(app._cfgDict['joinerRole'], 'Cmd_CamError')
     except:
         print(f'[SESS#{sess.code}] Closed WebSocket for role {role}.')
 
