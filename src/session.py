@@ -1,11 +1,11 @@
-from os          import makedirs, listdir
-from os.path     import isdir, exists
-from random      import choices
-from dataclasses import dataclass
-from json        import dumps
-from queue       import Queue
-from threading   import Thread
-from time        import sleep
+from os                 import makedirs, listdir
+from os.path            import isdir, exists
+from random             import choices
+from dataclasses        import dataclass
+from json               import dumps
+from queue              import Queue
+from concurrent.futures import ThreadPoolExecutor
+from time               import sleep
 
 
 @dataclass
@@ -48,8 +48,22 @@ class Session:
         except IndexError:
             return False
         
+        def int_finalizeStage(delay) -> None:
+            sleep(delay)
+
+            print(f'[SESS#{self.code}] Finished stage {self.config["stages"][self.stage.id]["id"]}.')
+            self.sendCommand('any', 'Cmd_EndStage')
+            self.stage.canSupply = False
+
+            # We might also have finished the session.
+            if self.stage.id == self.config['stages'][len(self.config['stages']) - 1]['id']:
+                self.sendCommand('any', 'Cmd_EndSession')
+
+                print(f'[SESS#{self.code}] Finished session #{self.code}.')
+                self.endSession()
+        
         self.stage = Stage(self.stage.id + 1, True)
-        Thread(target=self.disableSupplyAfterDelay, args=(stObj['time'],), daemon=True).start()
+        self.man._timers.submit(int_finalizeStage, stObj['time'])
 
         print(f'[SESS#{self.code}] Started stage {stObj.get("id")} ... ending in {stObj.get("time")} seconds.')
         return True
@@ -106,21 +120,6 @@ class Session:
             return
         cl.sendCommand(msg)
 
-    def disableSupplyAfterDelay(self, delay) -> None:
-        sleep(delay)
-
-        self.stage.canSupply = False
-
-        print(f'[SESS#{self.code}] Finished stage {self.config["stages"][self.stage.id]["id"]}.')
-        self.sendCommand('any', 'Cmd_EndStage')
-
-        # We might also have finished the session.
-        if self.stage.id == self.config['stages'][len(self.config['stages']) - 1]['id']:
-            self.sendCommand('any', 'Cmd_EndSession')
-
-            print(f'[SESS#{self.code}] Finished session #{self.code}.')
-            self.endSession()
-
     def endSession(self) -> None:
         self.sendCommand('any', 'SysCmd_EndSession')
 
@@ -131,6 +130,7 @@ class SessionManager:
     def __init__(self, config) -> None:
         self.sessionDict = {}
         self._config     = config
+        self._timers     = ThreadPoolExecutor(64)
 
         # Add 'pseudo'-sessions for the ones already created. These are the ones that are already in files/raw.
         if exists('files/raw'):

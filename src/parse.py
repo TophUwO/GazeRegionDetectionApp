@@ -8,6 +8,8 @@ from mediapipe.tasks        import python
 from mediapipe.tasks.python import vision
 from enum                   import Enum
 from dataclasses            import dataclass
+from threading              import Lock
+from concurrent.futures     import ThreadPoolExecutor
 
 from dlmdl                  import DownloadFaceLandmarkerModelBundle
 
@@ -53,9 +55,9 @@ class BoundingBox:
     def pad(self, extra: BoundingBox | tuple[float, float, float, float]) -> BoundingBox:
         l, t, r, b = extra
 
-        self.left   = max(0,     self.left   - l)
-        self.top    = max(0,     self.top    - t)
-        self.right  = min(1920,  self.right  + r)
+        self.left   = max(0,    self.left   - l)
+        self.top    = max(0,    self.top    - t)
+        self.right  = min(1920, self.right  + r)
         self.bottom = min(1080, self.bottom + b)
 
         return self
@@ -88,34 +90,42 @@ class FaceParser:
         self._opt  = vision.FaceLandmarkerOptions(base_options=self._bopt, num_faces=1)
         self._det  = vision.FaceLandmarker.create_from_options(self._opt)
         self._size = rawImgSize
+        self._lock = Lock()
+        self._exec = ThreadPoolExecutor(16)
 
-    async def processRawImage(self, image: bytes, sessId: str, stId: int, idx: int) -> None:
-        # Load image.
-        rawImg = PILImage.open(BytesIO(image)).convert('RGB')
-        npImg  = asarray(rawImg)
-        mpImg  = MPImage(image_format=ImageFormat.SRGB, data=npImg)
+    def processRawImage(self, image: bytes, imgPath: str, sessId: str, stId: int, idx: int) -> None:
+        def int_actualProcessRawImage(image: bytes, imgPath: str, sessId: str, stId: int, idx: int) -> None:
+            # Load image.
+            rawImg = PILImage.open(BytesIO(image)).convert('RGB')
+            npImg  = asarray(rawImg)
+            mpImg  = MPImage(image_format=ImageFormat.SRGB, data=npImg)
 
-        # Detect face landmarks.
-        res = None
-        try:
-            res = self._det.detect(mpImg).face_landmarks[0]
-        except IndexError:
-            print(f'[SESS#{sessId}] warning: No face detected for stage {stId} (idx: {idx}).')
+            # Detect face landmarks.
+            res = None
+            try:
+                with self._lock:
+                    res = self._det.detect(mpImg).face_landmarks[0]
+            except IndexError:
+                print(f'[SESS#{sessId}] warning: No face detected for stage {stId} (idx: {idx}). Discarding the image.')
 
-            return
-        # Calculate bounding boxes.
-        fbbox  = Internal_GetEntityBoundingBox(EntityId.FACE, res).scale(self._size).pad((250, 250, 250, 250))
-        lebbox = Internal_GetEntityBoundingBox(EntityId.LEFT, res).scale(self._size).pad((40, 40, 40, 40))
-        rebbox = Internal_GetEntityBoundingBox(EntityId.RIGHT, res).scale(self._size).pad((40, 40, 40, 40))
+                return
+            # Calculate bounding boxes.
+            fbbox  = Internal_GetEntityBoundingBox(EntityId.FACE, res).scale(self._size).pad((250, 250, 250, 250))
+            lebbox = Internal_GetEntityBoundingBox(EntityId.LEFT, res).scale(self._size).pad((40, 40, 40, 40))
+            rebbox = Internal_GetEntityBoundingBox(EntityId.RIGHT, res).scale(self._size).pad((40, 40, 40, 40))
 
-        # Crop face, left eye, and right eye.
-        faceCrop = rawImg.crop(fbbox.tuple()).resize((512, 512))
-        leCrop   = rawImg.crop(lebbox.tuple()).resize((256, 256))
-        reCrop   = rawImg.crop(rebbox.tuple()).resize((256, 256))
-        # Save results.
-        faceCrop.save(f'files/proc/{sessId}/face_{sessId}_{stId}_{idx}.jpg')
-        leCrop.save(f'files/proc/{sessId}/left_{sessId}_{stId}_{idx}.jpg')
-        reCrop.save(f'files/proc/{sessId}/right_{sessId}_{stId}_{idx}.jpg')
+            # Crop face, left eye, and right eye.
+            faceCrop = rawImg.crop(fbbox.tuple()).resize((512, 512))
+            leCrop   = rawImg.crop(lebbox.tuple()).resize((256, 256))
+            reCrop   = rawImg.crop(rebbox.tuple()).resize((256, 256))
+            # Save results.
+            rawImg.save(imgPath)
+            faceCrop.save(f'files/proc/{sessId}/face_{sessId}_{stId}_{idx}.jpg')
+            leCrop.save(f'files/proc/{sessId}/left_{sessId}_{stId}_{idx}.jpg')
+            reCrop.save(f'files/proc/{sessId}/right_{sessId}_{stId}_{idx}.jpg')
+
+        # Offload this to another thread.
+        self._exec.submit(int_actualProcessRawImage, image, imgPath, sessId, stId, idx)
 
 
 def Internal_GetEntityBoundingBox(id: EntityId, landmarks: list) -> BoundingBox:

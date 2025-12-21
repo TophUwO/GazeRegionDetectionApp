@@ -11,7 +11,6 @@ from queue         import Empty
 
 
 # TODO: document the fuck out of this
-# TODO: process images
 # TODO: schema
 
 
@@ -165,7 +164,7 @@ def saveImage():
     y      = -1
     try:
         form   = request.form
-        img    = (request.files)['image']
+        img    = request.files['image'].read()
 
         x      = int(form['objX'])
         y      = int(form['objY'])
@@ -181,10 +180,9 @@ def saveImage():
 
     with open(lblPath, 'w') as labelFile:
         labelFile.write(LabelGenerator.GenerateLabel(imgPath, code, index, region, x, y, time))
-    img.save(imgPath)
 
-    # # TODO: make it so that this runs in a worker thread
-    # await app.parser.processRawImage(image_bytes, code, sess.stageId, sess.idx)
+    # This spawns a worker thread processing the image.
+    app.parser.processRawImage(img, imgPath, code, region, index)
     return FormatResponse(ResponseStatus.Ok)
 
 
