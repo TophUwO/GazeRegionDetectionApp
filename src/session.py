@@ -2,7 +2,10 @@ from os          import makedirs, listdir
 from os.path     import isdir, exists
 from random      import choices
 from dataclasses import dataclass
-from asyncio     import create_task, sleep
+from json        import dumps
+from queue       import Queue
+from threading   import Thread
+from time        import sleep
 
 
 @dataclass
@@ -16,23 +19,27 @@ class Stage:
     canSupply: bool = False
 
 class Client:
-    def __init__(self, session: str, ws: any, role: str):
+    def __init__(self, session: str, role: str):
         self.sessionCode = session,
-        self.wsObj       = ws
         self.roleId      = role
+        self.queue       = Queue()
 
-    async def sendCommand(self, msg) -> None:
-        await self.wsObj.send(msg)
+    def sendCommand(self, msg) -> None:
+        jsonObj = dumps(msg, separators=[',', ':'])
+
+        self.queue.put(jsonObj)
 
 
 class Session:
-    def __init__(self, config, code):
+    def __init__(self, man, config, code):
         self.code    = code
         self.clients = Pair(None, None)
         self.stage   = Stage(-1, False)
         self.config  = config
         self.timer   = None
         self.lastIdx = -1
+        self.man     = man
+
 
     def gotoNextStage(self) -> bool:
         stObj = None
@@ -42,21 +49,21 @@ class Session:
             return False
         
         self.stage = Stage(self.stage.id + 1, True)
-        create_task(self.disableSupplyAfterDelay(stObj['time']))
+        Thread(target=self.disableSupplyAfterDelay, args=(stObj['time'],), daemon=True).start()
 
         print(f'[SESS#{self.code}] Started stage {stObj.get("id")} ... ending in {stObj.get("time")} seconds.')
         return True
         
-    def registerClient(self, role: str, ws: any) -> None:
+    def registerClient(self, role: str) -> None:
         if role not in self.config['roleIds']:
             print(f'error: Unknown role \'{role}\'.')
 
             return
         
         if role == self.config.get('creatorRole'):
-            self.clients.upper = Client(self.code, ws, role)
+            self.clients.upper = Client(self.code, role)
         elif role == self.config.get('joinerRole'):
-            self.clients.lower = Client(self.code, ws, role)
+            self.clients.lower = Client(self.code, role)
 
     def unregisterClient(self, role: str) -> None:
         if role not in self.config['roleIds']:
@@ -68,28 +75,27 @@ class Session:
             self.clients.upper = None
         elif role == self.config.get('joinerRole'):
             self.clients.lower = None
+
     
-    def setLastIndex(self, idx) -> None:
-        self.lastIdx = idx
-
-
-    def isEmpty(self) -> bool:
-        return self.clients.upper is None and self.clients.lower is None
+    def getQueue(self, role) -> Queue | None:
+        cl = self.clients.upper if role == self.config['creatorRole'] else self.clients.lower if role == self.config['joinerRole'] else None
+        if cl is not None:
+            return cl.queue
+        
+        return None
     
 
-    async def sendCommand(self, roleId: str, cmd: str, value: any = None) -> None:
+    def sendCommand(self, roleId: str, cmd: str, value: any = None) -> None:
         # Format message.
-        msg = f'''
-            {{
-                "command": "{cmd}",
-                "value":   "{value}"
-            }}
-        '''
+        msg = {
+            'command': cmd,
+            'value':   value
+        }
 
         # If role is 'any', do a broadcast.
         if roleId == 'any':
-            if self.clients.upper: await self.clients.upper.sendCommand(msg)
-            if self.clients.lower: await self.clients.lower.sendCommand(msg)
+            if self.clients.upper: self.clients.upper.sendCommand(msg)
+            if self.clients.lower: self.clients.lower.sendCommand(msg)
 
             return
         
@@ -98,19 +104,27 @@ class Session:
             print(f'error: Invalid role ID \'{roleId}\'.')
 
             return
-        await cl.sendCommand(msg)
+        cl.sendCommand(msg)
 
-    async def disableSupplyAfterDelay(self, delay) -> None:
-        await sleep(delay)
+    def disableSupplyAfterDelay(self, delay) -> None:
+        sleep(delay)
 
         self.stage.canSupply = False
 
         print(f'[SESS#{self.code}] Finished stage {self.config["stages"][self.stage.id]["id"]}.')
+        self.sendCommand('any', 'Cmd_EndStage')
+
+        # We might also have finished the session.
         if self.stage.id == self.config['stages'][len(self.config['stages']) - 1]['id']:
-            await self.sendCommand('any', 'Cmd_EndSession')
+            self.sendCommand('any', 'Cmd_EndSession')
 
             print(f'[SESS#{self.code}] Finished session #{self.code}.')
-        await self.sendCommand('any', 'Cmd_EndStage')
+            self.endSession()
+
+    def endSession(self) -> None:
+        self.sendCommand('any', 'SysCmd_EndSession')
+
+        self.man.deleteSession(self.code)
 
 
 class SessionManager:
@@ -122,10 +136,10 @@ class SessionManager:
         if exists('files/raw'):
             for ent in listdir('files/raw'):
                 if isdir(ent):
-                    self.sessionDict[ent] = Session(self._config, ent)
+                    self.sessionDict[ent] = Session(self, self._config, ent)
 
 
-    def createSession(self) -> Session:
+    def createSession(self) -> Session | None:
         def int_GenSessCode() -> str:
             return ''.join(choices('abcdef0123456789', k=6))
 
@@ -137,7 +151,7 @@ class SessionManager:
 
         # Create the new session.
         while True:
-            sess = Session(self._config, int_GenSessCode())
+            sess = Session(self, self._config, int_GenSessCode())
 
             # Add session.
             if sess.code in self.sessionDict:
@@ -149,7 +163,6 @@ class SessionManager:
         makedirs(f'files/raw/{sess.code}')
         makedirs(f'files/proc/{sess.code}')
 
-        # All good.
         return sess
 
     def deleteSession(self, code: str) -> None:
@@ -157,6 +170,7 @@ class SessionManager:
             return
 
         self.sessionDict.pop(code)
+
 
     def getSession(self, code: str) -> Session | None:
         sessCode = code.lower()

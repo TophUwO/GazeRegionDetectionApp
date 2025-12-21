@@ -24,7 +24,7 @@
                 "objcol": "yellow",
                 "objrad": 20
             },
-            "time":  5,
+            "time":  180,
             "speed": 5
         },
         {
@@ -44,7 +44,7 @@
                 "objcol": "yellow",
                 "objrad": 20
             },
-            "time":  5,
+            "time":  120,
             "speed": 5
         },
         {
@@ -64,7 +64,7 @@
                 "objcol": "yellow",
                 "objrad": 20
             },
-            "time":  5,
+            "time":  240,
             "speed": 5
         },
         {
@@ -74,7 +74,7 @@
                 "text": ""
             },
 
-            "time": 10
+            "time": 180
         }
     ]
 }

@@ -100,8 +100,17 @@ export class IntermediateReadyStage extends IntermediateStage {
  * 
  */
 export class IntermediateInstStage extends IntermediateStage {
-    CAPTION = 'inst caption'
-    TEXT    = 'inst text'
+    CAPTION = 'Instructions'
+
+    /**
+     * 
+     * @param {*} instTxt 
+     */
+    startIntermediateStage(instTxt) {
+        this.TEXT = instTxt
+
+        super.startIntermediateStage()
+    }
 }
 
 

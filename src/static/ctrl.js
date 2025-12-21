@@ -1,5 +1,5 @@
 import { ImageSubmitter               } from './imgsubm.js'
-import { SessionWebSocket             } from './ws.js'
+import { ServerEventSource            } from './sse.js'
 import { IntermediateCalibrationStage } from './calib.js'
 import { RegionRenderer               } from './regrender.js'
 
@@ -33,7 +33,7 @@ export class SessionControl {
         this.currViewId     = null
         this.roleId         = null
         this.sessionCode    = null
-        this.websocket      = null
+        this.sse            = null
         this.currIntermView = null
         this.currIntermObj  = null
         this.regRender      = null
@@ -65,8 +65,8 @@ export class SessionControl {
                 this.roleId      = data.payload.role
                 this.sessionCode = data.payload.code
 
-                /* Create websocket. */
-                this.websocket = await SessionWebSocket.Create(this, this.roleId, this.sessionCode)
+                /* Create SSE source. */
+                this.sse = new ServerEventSource(this)
 
                 /* Show session code so that the user can enter it in another client supposed to join the session. */
                 this.switchToView('viewCodeDisplay')
@@ -123,8 +123,8 @@ export class SessionControl {
                 this.roleId      = data.payload.role
                 this.sessionCode = data.payload.code
 
-                /* Create websocket. */
-                this.websocket = await SessionWebSocket.Create(this, this.roleId, this.sessionCode)
+                /* Create SSE source. */
+                this.sse = new ServerEventSource(this)
 
                 this.switchToIdleView()
                 return
@@ -198,6 +198,20 @@ export class SessionControl {
                     this.currIntermObj.startIntermediateStage(this.imgSubmitter.video)
 
                     break
+                case IntermediateInstStage:
+                    /* Get next stage. */
+                    const nextStageObj = this.config.stages[this.currStIdx + 1]
+                    if (nextStageObj == null) {
+                        this.displayFatalError(
+                            'Displayed instructions for a non-existent stage. This is an internal error and should ' + 
+                            'never happen.'
+                        )
+
+                        return
+                    }
+
+                    this.currIntermObj.startIntermediateStage(nextStageObj.inst.text)
+                    break
                 default:
                     this.currIntermObj.startIntermediateStage()
             }
@@ -229,8 +243,8 @@ export class SessionControl {
         if (this.imgSubmitter != null) this.imgSubmitter.destroy()
         if (this.regRender    != null) this.regRender.destroy()
 
-        if (this.websocket != null)
-            this.websocket.close()
+        if (this.sse != null)
+            this.sse.close()
     }
 
     
@@ -287,7 +301,7 @@ export class SessionControl {
         if (this.roleId == this.config.creatorRole) {
             this.imgSubmitter.endImageSubmitting()
 
-            if (this.currStObj == this.config.stages[this.config.stages.length - 1]) {
+            if (this.currStIdx >= this.config.stages.length - 1) {
                 this.switchToIntermediateView(IntermediateViewType.END)
 
                 return
@@ -312,14 +326,11 @@ export class SessionControl {
         /* Create image submitter component. */
         this.imgSubmitter = await ImageSubmitter.Create(this, 1920, 1080, this.config.ival)
         {
-            if (this.imgSubmitter == null) {
-                this.websocket.sendMessage('Msg_CamFailed')
-
+            if (this.imgSubmitter == null)
                 this.displayFatalError(
                     'Could not initialize image submitter component. Perhaps no camera is installed or the ' +
                     'application is not allowed to use it.'
                 )
-            }
         }
     }
 
@@ -328,16 +339,6 @@ export class SessionControl {
      */
     async onEndSession() {
         this.destroy()
-    }
-
-    /**
-     * 
-     */
-    async onCameraError() {
-        this.displayFatalError(
-            'Could not initialize camera. Please look at the client initializing the camera to view extended error ' +
-            'information.'
-        )
     }
 
 

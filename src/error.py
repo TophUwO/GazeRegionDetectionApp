@@ -1,5 +1,5 @@
 from enum  import Enum
-from quart import Response, jsonify
+from flask import Response, jsonify
 
 
 class ResponseStatus(Enum):
@@ -13,20 +13,22 @@ class ResponseStatus(Enum):
     InvalidAuthToken    = 7
     MissingSessionToken = 8
     MalformedRequest    = 9
+    CannotCreateSession = 10
 
 
 def FormatResponse(type: ResponseStatus, payload: dict[str, any] | None = None) -> tuple[Response, int]:
     GL_ERRORDICT: dict[ResponseStatus, tuple[str, str, int]] = {
-        ResponseStatus.Ok:                  ('ok',    'no error',                      200),
-        ResponseStatus.InvalidSessionToken: ('error', 'Invalid session token.',        404),
-        ResponseStatus.SessionNotFound:     ('error', 'Session not found.',            404),
-        ResponseStatus.CannotSupplyImages:  ('error', 'Cannot supply images.',         403),
-        ResponseStatus.InternalError:       ('error', 'Internal error occurred.',      500),
-        ResponseStatus.InvalidStage:        ('error', 'Invalid stage ID.',             500),
-        ResponseStatus.MissingAuthToken:    ('error', 'Missing authentication token.', 400),
-        ResponseStatus.InvalidAuthToken:    ('error', 'Invalid authentication token.', 401),
-        ResponseStatus.MissingSessionToken: ('error', 'Missing session token.',        400),
-        ResponseStatus.MalformedRequest:    ('error', 'Malformed request.',            400)
+        ResponseStatus.Ok:                  ('ok',    'no error',                            200),
+        ResponseStatus.InvalidSessionToken: ('error', 'Invalid session token.',              404),
+        ResponseStatus.SessionNotFound:     ('error', 'Session not found.',                  404),
+        ResponseStatus.CannotSupplyImages:  ('error', 'Window for image supply has closed.', 403),
+        ResponseStatus.InternalError:       ('error', 'Internal error occurred.',            500),
+        ResponseStatus.InvalidStage:        ('error', 'Invalid stage ID.',                   500),
+        ResponseStatus.MissingAuthToken:    ('error', 'Missing authentication token.',       400),
+        ResponseStatus.InvalidAuthToken:    ('error', 'Invalid authentication token.',       401),
+        ResponseStatus.MissingSessionToken: ('error', 'Missing session token.',              400),
+        ResponseStatus.MalformedRequest:    ('error', 'Malformed request.',                  400),
+        ResponseStatus.CannotCreateSession: ('error', 'Cannot create session.',              500)
     }
     
     try:
