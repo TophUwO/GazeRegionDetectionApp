@@ -47,8 +47,8 @@
             import { SessionControl } from '/static/ctrl.js'
 
             /* Initialize the application. */
-            const ctrl = await (async() => {
-                const [ctrlObj, err] = await SessionControl.Create()
+            const ctrl = (() => {
+                const [ctrlObj, err] = SessionControl.Create()
             
                 if (err != null) {
                     ctrlObj.displayFatalError(err.message)

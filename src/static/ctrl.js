@@ -344,7 +344,7 @@ export class SessionControl {
 
     /**
      */
-    static async Create() {
+    static Create() {
         let config
 
         /* Create session control. */
