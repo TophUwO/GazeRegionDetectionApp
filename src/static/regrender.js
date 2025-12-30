@@ -1,8 +1,7 @@
 /**
  */
 export class RegionRenderer {
-    constructor(ctrl, config) {
-        this.ctrl      = ctrl
+    constructor(config) {
         this.cfg       = config
         this.isDraw    = false
         this.startTime = -1

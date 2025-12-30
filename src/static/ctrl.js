@@ -66,7 +66,7 @@ export class SessionControl {
                 this.sessionCode = data.payload.code
 
                 /* Create SSE source. */
-                this.sse = new ServerEventSource(this)
+                this.sse = new ServerEventSource(this, this.sessionCode, this.roleId)
 
                 /* Show session code so that the user can enter it in another client supposed to join the session. */
                 this.switchToView('viewCodeDisplay')
@@ -124,7 +124,7 @@ export class SessionControl {
                 this.sessionCode = data.payload.code
 
                 /* Create SSE source. */
-                this.sse = new ServerEventSource(this)
+                this.sse = new ServerEventSource(this, this.sessionCode, this.roleId)
 
                 this.switchToIdleView()
                 return
@@ -264,12 +264,12 @@ export class SessionControl {
 
             /* Start image submitter on creator client. */
             if (this.roleId == this.config.creatorRole)
-                this.imgSubmitter.startImageSubmitting(this.currStObj.id)
+                this.imgSubmitter.startImageSubmitting(this.currStObj.id, this.sessionCode)
 
             /* Initialize region renderer on the active client but only if we got a region to render. */
             if (this.currStObj.region != null && this.currStObj.region.roleId == this.roleId) {
-                this.regRender = new RegionRenderer(this, this.currStObj)
-
+                this.regRender = new RegionRenderer(this.currStObj)
+w
                 this.switchToView('viewStage')
                 this.regRender.beginDraw()
                 return
@@ -324,7 +324,7 @@ export class SessionControl {
         this.switchToIntermediateView(IntermediateViewType.READY)
 
         /* Create image submitter component. */
-        this.imgSubmitter = await ImageSubmitter.Create(this, 1920, 1080, this.config.ival)
+        this.imgSubmitter = await ImageSubmitter.Create(1920, 1080, this.config.ival)
         {
             if (this.imgSubmitter == null)
                 this.displayFatalError(

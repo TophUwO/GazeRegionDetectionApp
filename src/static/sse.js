@@ -1,10 +1,10 @@
 export class ServerEventSource {
-    constructor(ctrl) {
+    constructor(ctrl, code, role) {
         this.ctrl = ctrl
-        this.sse  = new EventSource(`/sse/${ctrl.sessionCode}/${ctrl.roleId}`)
+        this.sse  = new EventSource(`/sse/${code}/${role}`)
 
         this.sse.onopen = (ev) => {
-            console.log(`Successfully opened SSE source for [${ctrl.sessionCode}::${ctrl.roleId}]`)
+            console.log(`Successfully opened SSE source for [${ctrl.sessionCode}::${role}]`)
         }
         this.sse.onerror = (ev) => {
             console.error('SSE error:', ev)

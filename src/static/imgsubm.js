@@ -3,20 +3,19 @@
 export class ImageSubmitter {
     /**
      * 
-     * @param {*} ctrl 
      * @param {*} canvas 
      * @param {*} stream 
      * @param {*} video 
      * @param {*} ival 
      */
-    constructor(ctrl, canvas, stream, video, ival) {
-        this.ctrl     = ctrl
+    constructor(canvas, stream, video, ival) {
         this.canvas   = canvas
         this.stream   = stream
         this.video    = video
         this.submIval = -1
         this.ival     = ival
         this.stageId  = -1
+        this.sessCode = ''
 
         /* Create worker thread for image creation. This is so that the ball does not lag due to image processing. */
         this.worker = new Worker('./static/imgmk.js')
@@ -27,9 +26,10 @@ export class ImageSubmitter {
      * 
      * @param {*} stageId 
      */
-    startImageSubmitting(stageId) {
+    startImageSubmitting(stageId, code) {
         this.submIdx  = 0
         this.stageId  = stageId
+        this.sessCode = code
         this.submIval = setInterval(this.submitImage.bind(this), this.ival)
     }
 
@@ -65,7 +65,7 @@ export class ImageSubmitter {
                 idx:    this.submIdx++,
                 ballX:  -1,
                 ballY:  -1,
-                code:   this.ctrl.sessionCode,
+                code:   this.sessCode,
                 region: this.stageId,
                 time:   Date.now()
             }, [bmp])
@@ -75,13 +75,12 @@ export class ImageSubmitter {
 
     /**
      * 
-     * @param {*} ctrl 
      * @param {*} imgWidth 
      * @param {*} imgHeight 
      * @param {*} ival 
      * @returns 
      */
-    static async Create(ctrl, imgWidth, imgHeight, ival) {
+    static async Create(imgWidth, imgHeight, ival) {
         let stream
 
         const canvas = document.createElement('canvas')
@@ -114,7 +113,7 @@ export class ImageSubmitter {
             canvas.height = video.videoHeight
         }
 
-        return new ImageSubmitter(ctrl, canvas, stream, video, ival)
+        return new ImageSubmitter(canvas, stream, video, ival)
     }
 }
 
