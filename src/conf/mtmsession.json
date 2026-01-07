@@ -19,7 +19,7 @@
                 "left":   0.0,
                 "top":    0.0,
                 "right":  1.0,
-                "bottom": 0.75,
+                "bottom": 0.786,
                 "color":  "#111111",
                 "objcol": "yellow",
                 "objrad": 20
@@ -36,9 +36,9 @@
 
             "region": {
                 "roleId": "top",
-                "left":   0.0,
-                "top":    0.75,
-                "right":  1.0,
+                "left":   0.1057,
+                "top":    0.786,
+                "right":  0.8942,
                 "bottom": 1.0,
                 "color":  "#111111",
                 "objcol": "yellow",
