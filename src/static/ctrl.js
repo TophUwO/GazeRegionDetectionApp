@@ -269,7 +269,7 @@ export class SessionControl {
             /* Initialize region renderer on the active client but only if we got a region to render. */
             if (this.currStObj.region != null && this.currStObj.region.roleId == this.roleId) {
                 this.regRender = new RegionRenderer(this.currStObj)
-w
+
                 this.switchToView('viewStage')
                 this.regRender.beginDraw()
                 return
