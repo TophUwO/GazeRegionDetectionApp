@@ -210,7 +210,6 @@ def handleSSE(code, role):
             except Empty:
                 yield ': __HEATBEAT__\n\n'
 
-                print(f'sent heartbeat to {role}')
                 continue
 
             yield f'data: {message}\n\n'
@@ -233,7 +232,6 @@ if __name__ == "__main__":
 
         exit(1)
 
-    # Run the thing.
     app.run(
         host="0.0.0.0",
         port=8443,

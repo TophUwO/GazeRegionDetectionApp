@@ -11,7 +11,7 @@
             "id":   0,
             "desc": "",
             "inst": {
-                "text": ""
+                "text": "In this stage you must follow the ball that is bouncing in the emphasized area. The timer tells you how long you need to keep doing it. After the stage, it should display the \"Stage finished\" screen."
             },
 
             "region": {
@@ -31,7 +31,7 @@
             "id":   1,
             "desc": "",
             "inst": {
-                "text": ""
+                "text": "In this stage you must follow the ball that is bouncing in the emphasized area. The timer tells you how long you need to keep doing it. After the stage, it should display the \"Stage finished\" screen."
             },
 
             "region": {
@@ -51,7 +51,7 @@
             "id":   2,
             "desc": "",
             "inst": {
-                "text": ""
+                "text": "In this stage you must follow the ball that is bouncing in the emphasized area. The timer tells you how long you need to keep doing it. After the stage, it should display the \"Stage finished\" screen."
             },
 
             "region": {
@@ -71,7 +71,7 @@
             "id":   3,
             "desc": "",
             "inst": {
-                "text": ""
+                "text": "In this last stage we collect data for the fourth \"outside of screen\" area. For this, please do not look at the screen at any point in time. There will be no timer on any of the screens. However, when the stage is finished, it will show that on the upper screen. If you need a timer, you can simply set a timer on your phone. The time for this stage is three minutes (180 secs)."
             },
 
             "time": 180

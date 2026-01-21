@@ -130,7 +130,6 @@ export class SessionControl {
                 return
             }
 
-            /* Error occurred. */
             this.displayFatalError(data.desc)
         })
 
@@ -139,7 +138,7 @@ export class SessionControl {
         cntBtn.addEventListener('click', async() => {
             const nextView = SessionControl.GetNextIntermediateView(this.currIntermView)
 
-            /* Do we need to start a stage. */
+            /* Do we need to start a stage? */
             if (nextView == null) {
                 const res = await fetch('/api/advance', {
                     method:  'POST',
@@ -154,7 +153,7 @@ export class SessionControl {
                 return
             }
 
-            /* Only change intermediate view. */
+            /* We don't. In this case we simply switch to the next intermediate view. */
             this.switchToIntermediateView(nextView)
         })
     }
@@ -347,7 +346,6 @@ export class SessionControl {
     static Create() {
         let config
 
-        /* Create session control. */
         const sessCtrl = new SessionControl()
 
         /* We need to be in a secure context for this application to even work. */
