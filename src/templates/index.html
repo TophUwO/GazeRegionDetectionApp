@@ -1,0 +1,127 @@
+<html>
+    <head>
+        <title>Gaze Region Classification</title>
+    </head>
+    <body>
+        <div class="page" id="viewWelcome">
+            <div class="divOuterContainer" id="divWelcome">
+                <button id="btnCreateSession">Create Session</button>
+
+                <div class="sessionMngtForm">
+                    <input type="text" id="inpSessionToken" placeholder="6-digit hex session token"></input>
+                    <button id="btnJoinSession">Join Session</button>
+                </div>
+            </div>
+        </div>
+        <div class="page" id="viewCodeDisplay">
+            <h1 id="lblCodeDisplay"></h1>
+        </div>
+        <div class="page" id="viewIdle"></div>
+        <div class="page" id="viewStage">
+            <canvas id="canvArea"></canvas>
+        </div>
+        <div class="page" id="viewInterm">
+            <h1 id="h1IntermCaption"></h1>
+            <label id="lblIntermText"></label>
+
+            <div id="divIntermElementsContainer">
+                <canvas id="canvCalibrationOverlay"></canvas>
+            </div>
+            <br><br>
+            <div id="divIntermFooter">
+                Press 'Continue' to get to the next stage.
+
+                <button id="btnIntermCont">Continue</button>
+            </div>
+        </div>
+        <div class="page" id="viewFatalError">
+            <h1>Fatal Error</h1>
+            
+            <label id="lblFatalErrorDesc"></label>
+        </div>
+
+        <script type="application/json" id="scrSessionConfig">
+            {{ GL_SESSION_CONFIG | tojson }}
+        </script>
+        <script type="module">
+            import { SessionControl } from '/static/ctrl.js'
+
+            /* Initialize the application. */
+            const ctrl = (() => {
+                const [ctrlObj, err] = SessionControl.Create()
+            
+                if (err != null) {
+                    ctrlObj.displayFatalError(err.message)
+                
+                    return null;
+                }
+                
+                return ctrlObj
+            })()
+        
+            /* Show welcome page so we can create or join a session. */
+            if (ctrl != null)
+                ctrl.switchToView('viewWelcome')
+        </script>
+        <style>
+            html, body {
+                width:            100%;
+                height:           100%;
+                margin:           0;
+                font-family:      Arial, sans-serif;
+                display:          flex;
+                justify-content:  center;
+                align-items:      center;
+                color:            white;
+                background-color: rgb(11, 11, 11);
+            }
+
+            .divOuterContainer {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+                padding: 30px 40px;
+                border-radius: 10px;
+                border-width: 2px;
+                border-color: black;
+                margin: 3px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                background-color: rgb(33, 33 ,33);
+            }
+
+            #lblCouldNotCreateSes, #lblCouldNotJoinSes, #lblEmptyToken {
+                display: none;
+                color:   red;
+            }
+
+            #lblCodeDisplay, h1 {
+                display: block;
+                color: white;
+            }
+
+            #lblSessionReady {
+                display: block;
+                color: green;
+            }
+
+            .page {
+                display: none;
+            }
+
+            #canvasPhoto { 
+                display: none;
+            }
+
+            #vidCalibration {
+                display: none;
+            }
+
+            #divIntermElementsContainer {
+                display: none;
+            }
+        </style>
+    </body>
+</html>
+
+

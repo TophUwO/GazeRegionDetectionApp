@@ -1,0 +1,80 @@
+{
+    "name":        "MtMRegions",
+    "desc":        "main display regions of Match-the-Monkeys",
+    "roleIds":     ["top", "bottom"],
+    "creatorRole": "top",
+    "joinerRole":  "bottom",
+    "ival":        250,
+
+    "stages": [
+        {
+            "id":   0,
+            "desc": "",
+            "inst": {
+                "text": "In this stage you must follow the ball that is bouncing in the emphasized area. The timer tells you how long you need to keep doing it. After the stage, it should display the \"Stage finished\" screen."
+            },
+
+            "region": {
+                "roleId": "top",
+                "left":   0.0,
+                "top":    0.0,
+                "right":  1.0,
+                "bottom": 0.786,
+                "color":  "#111111",
+                "objcol": "yellow",
+                "objrad": 20
+            },
+            "time":  180,
+            "speed": 5
+        },
+        {
+            "id":   1,
+            "desc": "",
+            "inst": {
+                "text": "In this stage you must follow the ball that is bouncing in the emphasized area. The timer tells you how long you need to keep doing it. After the stage, it should display the \"Stage finished\" screen."
+            },
+
+            "region": {
+                "roleId": "top",
+                "left":   0.1057,
+                "top":    0.786,
+                "right":  0.8942,
+                "bottom": 1.0,
+                "color":  "#111111",
+                "objcol": "yellow",
+                "objrad": 20
+            },
+            "time":  120,
+            "speed": 5
+        },
+        {
+            "id":   2,
+            "desc": "",
+            "inst": {
+                "text": "In this stage you must follow the ball that is bouncing in the emphasized area. The timer tells you how long you need to keep doing it. After the stage, it should display the \"Stage finished\" screen."
+            },
+
+            "region": {
+                "roleId": "bottom",
+                "left":   0.0,
+                "top":    0.0,
+                "right":  1.0,
+                "bottom": 1.0,
+                "color":  "#111111",
+                "objcol": "yellow",
+                "objrad": 20
+            },
+            "time":  240,
+            "speed": 5
+        },
+        {
+            "id":   3,
+            "desc": "",
+            "inst": {
+                "text": "In this last stage we collect data for the fourth \"outside of screen\" area. For this, please do not look at the screen at any point in time. There will be no timer on any of the screens. However, when the stage is finished, it will show that on the upper screen. If you need a timer, you can simply set a timer on your phone. The time for this stage is three minutes (180 secs)."
+            },
+
+            "time": 180
+        }
+    ]
+}

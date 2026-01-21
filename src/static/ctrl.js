@@ -346,7 +346,6 @@ export class SessionControl {
     static Create() {
         let config
 
-        /* Create session control. */
         const sessCtrl = new SessionControl()
 
         /* We need to be in a secure context for this application to even work. */
