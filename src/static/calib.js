@@ -13,7 +13,9 @@ export class IntermediateCalibrationStage extends IntermediateStage {
     CAPTION     = 'Calibration'
     TEXT        = 'This application requires the person in front of the screen to position themselves so that the ' + 
                   'entire face sits comfortably around the vertical center of the frame. Horizontal movement — as long as ' +
-                  'the entire face is comfortably (min. 300px distance to any edge) inside the frame — is allowed.'
+                  'the entire face is comfortably (min. 300px distance to any edge) inside the frame — is allowed. Make ' + 
+                  'sure that nothing is obstructing your face, e.g. hair, other objects, hands, etc. Also make sure that ' + 
+                  'you are in a bright room with relatively soft lighting. Avoid bright light sources behind you.'
 
     /**
      */
