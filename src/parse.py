@@ -93,8 +93,8 @@ class FaceParser:
         self._lock = Lock()
         self._exec = ThreadPoolExecutor(16)
 
-    def processRawImage(self, image: bytes, imgPath: str, sessId: str, stId: int, idx: int) -> None:
-        def int_actualProcessRawImage(image: bytes, imgPath: str, sessId: str, stId: int, idx: int) -> None:
+    def processRawImage(self, sess, image: bytes, imgPath: str, sessId: str, stId: int, idx: int) -> None:
+        def int_actualProcessRawImage(image: bytes, sess, imgPath: str, sessId: str, stId: int, idx: int) -> None:
             # Load image.
             rawImg = PILImage.open(BytesIO(image)).convert('RGB')
             npImg  = asarray(rawImg)
@@ -108,7 +108,9 @@ class FaceParser:
             except IndexError:
                 print(f'[SESS#{sessId}] warning: No face detected for stage {stId} (idx: {idx}). Discarding the image.')
 
+                sess.sendCommandToHook('Cmd_SubmitError', 'No face detected')
                 return
+            
             # Calculate bounding boxes.
             fbbox  = Internal_GetEntityBoundingBox(EntityId.FACE, res).scale(self._size).pad((250, 250, 250, 250))
             lebbox = Internal_GetEntityBoundingBox(EntityId.LEFT, res).scale(self._size).pad((40, 40, 40, 40))
@@ -125,7 +127,7 @@ class FaceParser:
             reCrop.save(f'files/proc/{sessId}/right_{sessId}_{stId}_{idx}.jpg')
 
         # Offload this to another thread.
-        self._exec.submit(int_actualProcessRawImage, image, imgPath, sessId, stId, idx)
+        self._exec.submit(int_actualProcessRawImage, image, sess, imgPath, sessId, stId, idx)
 
 
 def Internal_GetEntityBoundingBox(id: EntityId, landmarks: list) -> BoundingBox:

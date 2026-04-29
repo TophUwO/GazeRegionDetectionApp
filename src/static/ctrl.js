@@ -1,7 +1,7 @@
-import { ImageSubmitter               } from './imgsubm.js'
-import { ServerEventSource            } from './sse.js'
-import { IntermediateCalibrationStage } from './calib.js'
-import { RegionRenderer               } from './regrender.js'
+import { ImageSubmitter                     } from './imgsubm.js'
+import { ServerEventSource, HookEventSource } from './sse.js'
+import { IntermediateCalibrationStage       } from './calib.js'
+import { RegionRenderer                     } from './regrender.js'
 
 import { 
     IntermediateReadyStage,
@@ -53,6 +53,7 @@ export class SessionControl {
         const crBtn  = document.getElementById('btnCreateSession')
         const jnBtn  = document.getElementById('btnJoinSession')
         const cntBtn = document.getElementById('btnIntermCont')
+        const hkBtn  = document.getElementById('btnHookSession')
 
         /* Create listener for the 'Create session' button in the 'Welcome' view. */
         crBtn.addEventListener('click', async() => {
@@ -155,6 +156,46 @@ export class SessionControl {
 
             /* We don't. In this case we simply switch to the next intermediate view. */
             this.switchToIntermediateView(nextView)
+        })
+
+        /**
+         * 
+         */
+        hkBtn.addEventListener('click', async() => {
+            let code
+
+            /* Get the session code from the respective input element. */
+            const inpElem = document.getElementById('inpSessionToken')
+            {
+                if (inpElem == null || (code = inpElem.value) == '') {
+                    this.displayFatalError(
+                        'Could not retrieve session code from the input field. Perhaps it was empty. Refresh the ' + 
+                        'page to retry.'
+                    )
+
+                    return
+                }
+            }
+
+            const res  = await fetch('/api/hook', { 
+                method:  'POST',
+                headers: {
+                    'session': code
+                }
+            })
+            const data = await res.json()
+
+            if (data.type == 'ok') {
+                this.sessionCode = data.payload.code
+
+                /* Create SSE source. */
+                this.sse = new HookEventSource(this, this.sessionCode)
+
+                this.switchToView('viewHook')
+                return
+            }
+
+            this.displayFatalError(data.desc)
         })
     }
 

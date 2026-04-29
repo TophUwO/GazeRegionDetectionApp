@@ -34,6 +34,7 @@ class Session:
     def __init__(self, man, config, code):
         self.code    = code
         self.clients = Pair(None, None)
+        self.hook    = None
         self.stage   = Stage(-1, False)
         self.config  = config
         self.timer   = None
@@ -53,11 +54,13 @@ class Session:
 
             print(f'[SESS#{self.code}] Finished stage {self.config["stages"][self.stage.id]["id"]}.')
             self.sendCommand('any', 'Cmd_EndStage')
+            self.sendCommandToHook('Cmd_EndStage')
             self.stage.canSupply = False
 
             # We might also have finished the session.
             if self.stage.id == self.config['stages'][len(self.config['stages']) - 1]['id']:
                 self.sendCommand('any', 'Cmd_EndSession')
+                self.sendCommandToHook('Cmd_EndSession')
 
                 print(f'[SESS#{self.code}] Finished session #{self.code}.')
                 self.endSession()
@@ -79,6 +82,12 @@ class Session:
         elif role == self.config.get('joinerRole'):
             self.clients.lower = Client(self.code, role)
 
+    def createHook(self) -> None:
+        self.hook = Client(self.code, '')
+
+    def destroyHook(self) -> None:
+        self.hook = None
+
     def unregisterClient(self, role: str) -> None:
         if role not in self.config['roleIds']:
             print(f'error: Unknown role \'{role}\'.')
@@ -97,6 +106,12 @@ class Session:
             return cl.queue
         
         return None
+    
+    def getHookQueue(self) -> Queue | None:
+        if self.hook is None:
+            return None
+        
+        return self.hook.queue
     
 
     def sendCommand(self, roleId: str, cmd: str, value: any = None) -> None:
@@ -120,8 +135,20 @@ class Session:
             return
         cl.sendCommand(msg)
 
+    def sendCommandToHook(self, cmd: str, value: any = None) -> None:
+        if self.hook is None:
+            return
+        
+        # Format and send message.
+        msg = {
+            'command': cmd,
+            'value':   value
+        }
+        self.hook.sendCommand(msg)
+
     def endSession(self) -> None:
         self.sendCommand('any', 'SysCmd_EndSession')
+        self.sendCommandToHook('SysCmd_EndSession')
 
         self.man.deleteSession(self.code)
 

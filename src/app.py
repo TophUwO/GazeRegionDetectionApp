@@ -74,7 +74,8 @@ class DataCollectionApp(Flask):
         print('info: Initialized application. Ready.')
 
 
-# $env:DATACOLL_USED_REGION_CONFIG="src/conf/mtmsession.json"; $env:DATACOLL_USED_CERT="..."; $env:DATACOLL_USED_KEY="..."; python src/app.py
+# ps: $env:DATACOLL_USED_REGION_CONFIG="src/conf/mtmsession.json"; $env:DATACOLL_USED_CERT="..."; $env:DATACOLL_USED_KEY="..."; python src/app.py
+# li: DATACOLL_USED_REGION_CONFIG="src/conf/mtmsession.json" DATACOLL_USED_CERT="..." DATACOLL_USED_KEY="..." python src/app.py
 app = DataCollectionApp()
 
 
@@ -121,10 +122,29 @@ def joinSession():
     
     # All good.
     sess.sendCommand(app._cfgDict['creatorRole'], 'Cmd_Ready')
+    sess.sendCommandToHook('Cmd_Ready')
     return FormatResponse(ResponseStatus.Ok, {
         'code': sess.code,
         'role': app._cfgDict['joinerRole']
     })
+
+@app.route('/api/hook', methods=['POST'])
+def hookIntoSession():
+    code = request.headers.get('session', type=str, default=None)
+    if code is None:
+        return FormatResponse(ResponseStatus.InvalidSessionToken)
+    
+    # Get session.
+    sess = app.sman.getSession(code)
+    if sess is None:
+        return FormatResponse(ResponseStatus.SessionNotFound)
+    
+    # Create hook.
+    sess.createHook()
+    return FormatResponse(ResponseStatus.Ok, {
+        'code': sess.code
+    })
+
 
 @app.route('/api/advance', methods=['POST'])
 def advanceStage():
@@ -140,6 +160,7 @@ def advanceStage():
         return FormatResponse(ResponseStatus.InvalidStage)
 
     sess.sendCommand('any', 'Cmd_StartStage')
+    sess.sendCommandToHook('Cmd_StartStage')
     return FormatResponse(ResponseStatus.Ok)
 
 @app.route('/api/submit', methods=['POST'])
@@ -152,6 +173,8 @@ def saveImage():
     if sess is None:
         return FormatResponse(ResponseStatus.SessionNotFound)
     elif not sess.stage.canSupply:
+        sess.sendCommandToHook('Cmd_SubmitError', 'Cannot supply images')
+
         return FormatResponse(ResponseStatus.CannotSupplyImages)
 
     # Parse request.
@@ -172,6 +195,8 @@ def saveImage():
         region = int(form['region'])
         time   = int(form['time'])
     except:
+        sess.sendCommandToHook('Cmd_SubmitError', 'Malformed request')
+
         return FormatResponse(ResponseStatus.MalformedRequest)
 
     # Save and process.
@@ -182,11 +207,11 @@ def saveImage():
         labelFile.write(LabelGenerator.GenerateLabel(imgPath, code, index, region, x, y, time))
 
     # This spawns a worker thread processing the image.
-    app.parser.processRawImage(img, imgPath, code, region, index)
+    app.parser.processRawImage(sess, img, imgPath, code, region, index)
     return FormatResponse(ResponseStatus.Ok)
 
 
-@app.route('/sse/<code>/<role>', methods=['GET'])
+@app.route('/sse/comm/<code>/<role>', methods=['GET'])
 def handleSSE(code, role):
     if "text/event-stream" not in request.accept_mimetypes:
         abort(400)
@@ -215,6 +240,41 @@ def handleSSE(code, role):
             yield f'data: {message}\n\n'
 
     res = make_response(int_dispatchMessage(), {
+        'Content-Type':      'text/event-stream',
+        'Cache-Control':     'no-cache',
+        'Transfer-Encoding': 'chunked',
+    })
+    res.timeout = None
+    return res
+
+@app.route('/sse/hook/<code>', methods=['GET'])
+def handleHookSSE(code):
+    if "text/event-stream" not in request.accept_mimetypes:
+        abort(400)
+
+    sess = app.sman.getSession(code)
+    if sess is None:
+        abort(404)
+
+    q = sess.getHookQueue()
+    def int_dispatchHookMessage():
+        yield ': __HELLO__\n\n'
+
+        while True:
+            message = None
+            try:
+                message = q.get(timeout=10)
+
+                if message == 'SysCmd_EndSession':
+                    return
+            except Empty:
+                yield ': __HEATBEAT__\n\n'
+
+                continue
+
+            yield f'data: {message}\n\n'
+
+    res = make_response(int_dispatchHookMessage(), {
         'Content-Type':      'text/event-stream',
         'Cache-Control':     'no-cache',
         'Transfer-Encoding': 'chunked',
