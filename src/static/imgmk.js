@@ -2,6 +2,8 @@
  * @param {*} msg 
  */
 self.onmessage = async(msg) => {
+    const s = performance.now();
+
     const {
         bmp,
         idx,
@@ -18,7 +20,7 @@ self.onmessage = async(msg) => {
         ctx.drawImage(bmp, 0, 0, 1920, 1080)
     }
 
-    const blob = await cvOff.convertToBlob({type: 'image/jpeg', quality: 0.9 })
+    const blob = await cvOff.convertToBlob({type: 'image/jpeg', quality: 0.5 })
     const form = new FormData()
     {
         form.append('image',   blob, 'IMG')
@@ -41,6 +43,10 @@ self.onmessage = async(msg) => {
 
     if (data.type != 'ok')
         console.error(`Could not submit image. Reason: ${data.desc}`)
+
+    const e = performance.now();
+    const t = e - s;
+    console.log(`Making image took ${t} ms.`)
 }
 
 
