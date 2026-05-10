@@ -191,10 +191,10 @@ def saveImage():
             return FormatResponse(ResponseStatus.MalformedJson)
         
         return FormatResponse(ResponseStatus.Ok)
-    elif not sess.stage.canSupply:
-        sess.sendCommandToHook('Cmd_SubmitError', 'Cannot supply images')
+    # elif not sess.stage.canSupply:
+    #   sess.sendCommandToHook('Cmd_SubmitError', 'Cannot supply images')
 
-        return FormatResponse(ResponseStatus.CannotSupplyImages)
+    #    return FormatResponse(ResponseStatus.CannotSupplyImages)
 
     # Case 2: Image submission. Do some preprocessing and save.
     form   = None
