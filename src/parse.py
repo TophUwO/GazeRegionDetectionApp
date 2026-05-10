@@ -112,7 +112,7 @@ class FaceParser:
             
             # Calculate EAR and decide if the person's eyes are closed.
             ear_l, ear_r = Internal_CalcEAR(res)
-            print(f'[SESS#{sessId}] info: EAR = {ear_l}, {ear_r}')
+            # print(f'[SESS#{sessId}] info: EAR = {ear_l}, {ear_r}')
             if ear_l < 0.25 or ear_r < 0.25:
                 print(f'[SESS#{sessId}] warning: At least one eye closed or nearly closed. Discarding the image.')
 

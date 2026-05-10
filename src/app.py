@@ -219,7 +219,7 @@ def saveImage():
         return FormatResponse(ResponseStatus.MalformedRequest)
 
     # Save and process.
-    imgPath = f'files/raw/{code}/img_{code}_{region}_{index}.png'
+    imgPath = f'files/raw/{code}/img_{code}_{region}_{index}.jpg'
     lblPath = f'files/raw/{code}/lbl_{code}_{region}_{index}.json'
 
     with open(lblPath, 'w') as labelFile:
