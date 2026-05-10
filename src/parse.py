@@ -2,7 +2,7 @@ from __future__             import annotations
 
 from io                     import BytesIO
 from PIL                    import Image as PILImage
-from numpy                  import asarray
+from numpy                  import asarray, linalg, array
 from mediapipe              import Image as MPImage, ImageFormat
 from mediapipe.tasks        import python
 from mediapipe.tasks.python import vision
@@ -57,8 +57,8 @@ class BoundingBox:
 
         self.left   = max(0,    self.left   - l)
         self.top    = max(0,    self.top    - t)
-        self.right  = min(1920, self.right  + r)
-        self.bottom = min(1080, self.bottom + b)
+        self.right  = min(1280, self.right  + r)
+        self.bottom = min(720,  self.bottom + b)
 
         return self
     
@@ -77,7 +77,6 @@ class LabelGenerator:
                 "time":   {ts}
             }}
         '''
-
 
 class FaceParser:
     def __init__(self, rawImgSize: tuple[float, float]):
@@ -108,9 +107,22 @@ class FaceParser:
             except IndexError:
                 print(f'[SESS#{sessId}] warning: No face detected for stage {stId} (idx: {idx}). Discarding the image.')
 
-                sess.sendCommandToHook('Cmd_SubmitError', 'No face detected')
+                sess.sendCommandToHook('Cmd_SubmitError', 'No face detected.')
                 return
             
+            # Calculate EAR and decide if the person's eyes are closed.
+            ear_l, ear_r = Internal_CalcEAR(res)
+            print(f'[SESS#{sessId}] info: EAR = {ear_l}, {ear_r}')
+            if ear_l < 0.25 or ear_r < 0.25:
+                print(f'[SESS#{sessId}] warning: At least one eye closed or nearly closed. Discarding the image.')
+
+                sess.sendCommandToHook('Cmd_SubmitError', 'At least one eye is almost or fully closed.')
+                return
+            
+            # Save raw image.
+            rawImg.save(imgPath)
+            
+        """
             # Calculate bounding boxes.
             fbbox  = Internal_GetEntityBoundingBox(EntityId.FACE, res).scale(self._size).pad((250, 250, 250, 250))
             lebbox = Internal_GetEntityBoundingBox(EntityId.LEFT, res).scale(self._size).pad((40, 40, 40, 40))
@@ -125,11 +137,37 @@ class FaceParser:
             faceCrop.save(f'files/proc/{sessId}/face_{sessId}_{stId}_{idx}.jpg')
             leCrop.save(f'files/proc/{sessId}/left_{sessId}_{stId}_{idx}.jpg')
             reCrop.save(f'files/proc/{sessId}/right_{sessId}_{stId}_{idx}.jpg')
+        """
 
-        # Offload this to another thread.
+        # Spawn a thread that does the actual processing in order not to overload the request handler. Doing the
+        # processing on the same thread as the request blocks one of the Flask workers. If all workers are blocked, then
+        # images may be dropped.
         self._exec.submit(int_actualProcessRawImage, image, sess, imgPath, sessId, stId, idx)
 
 
+
+def Internal_CalcEAR(lm: list) -> tuple[float, float]:
+    # Taken from: https://github.com/Pushtogithub23/Eye-Blink-Detection-using-MediaPipe-and-OpenCV
+    LEFT_EYE_LM  = [362, 380, 374, 263, 386, 385]
+    RIGHT_EYE_LM = [33, 159, 158, 133, 153, 145]
+
+    leftEAR  = 0.0
+    rightEAR = 0.0
+    for i, eye in [(0, LEFT_EYE_LM), (1, RIGHT_EYE_LM)]:
+        p1, p2, p3, p4, p5, p6 = eye
+
+        # EAR = (||p2 - p6|| + ||p3 - p5||) / (2 * ||p1 - p4||)
+        numEAR  = linalg.norm(array([lm[p2].x, lm[p2].y]) - array([lm[p6].x, lm[p6].y])) + linalg.norm(array([lm[p3].x, lm[p3].y]) - array([lm[p5].x, lm[p5].y]))
+        denEAR  = 2 * linalg.norm(array([lm[p1].x, lm[p1].y]) - array([lm[p4].x, lm[p4].y]))
+        EAR     = numEAR / denEAR if denEAR != 0.0 else 0.0
+
+        if i == 0: leftEAR  = EAR
+        if i == 1: rightEAR = EAR
+
+    return leftEAR, rightEAR
+
+
+"""
 def Internal_GetEntityBoundingBox(id: EntityId, landmarks: list) -> BoundingBox:
     # Taken from: https://gist.github.com/Asadullah-Dal17/fd71c31bac74ee84e6a31af50fa62961
     LEFT_EYE  = [ 362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398 ]
@@ -156,5 +194,6 @@ def Internal_GetEntityBoundingBox(id: EntityId, landmarks: list) -> BoundingBox:
         res.bottom = max(res.bottom, lm.y)
 
     return res
+"""
 
 

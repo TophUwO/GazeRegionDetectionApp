@@ -4,7 +4,7 @@ from flask.helpers import make_response
 from session       import SessionManager
 from error         import ResponseStatus, FormatResponse
 from parse         import FaceParser, LabelGenerator
-from json          import loads
+from json          import loads, dumps
 from os            import getenv
 from jsonschema    import validate
 from queue         import Empty
@@ -172,12 +172,31 @@ def saveImage():
     sess = app.sman.getSession(code)
     if sess is None:
         return FormatResponse(ResponseStatus.SessionNotFound)
+    
+    # Case 1: Movable element positions data. Write them as a JSON file.
+    what = request.headers.get('what', type=str, default=None)
+    if what is not None:
+        pos   = request.get_json(silent=True)
+        stage = request.headers.get('stage', type=int, default=-1)
+
+        if pos:
+            with open(f'files/pos/{code}_{stage}.json', 'w') as f:
+                f.write(dumps(pos, indent=4))
+
+                print(f'[SESS#{code}] info: Saved positions for session #{code} and stage id #{stage}.')
+        else:
+            print(f'[SESS#{code}] error: Failed to save positions. JSON is malformed.')
+
+            sess.sendCommandToHook('Cmd_SubmitError', 'Malformed ball position data.')
+            return FormatResponse(ResponseStatus.MalformedJson)
+        
+        return FormatResponse(ResponseStatus.Ok)
     elif not sess.stage.canSupply:
         sess.sendCommandToHook('Cmd_SubmitError', 'Cannot supply images')
 
         return FormatResponse(ResponseStatus.CannotSupplyImages)
 
-    # Parse request.
+    # Case 2: Image submission. Do some preprocessing and save.
     form   = None
     img    = None
     index  = -1
@@ -206,7 +225,7 @@ def saveImage():
     with open(lblPath, 'w') as labelFile:
         labelFile.write(LabelGenerator.GenerateLabel(imgPath, code, index, region, x, y, time))
 
-    # This spawns a worker thread processing the image.
+    # Do some basic checking on the image and save it. This spawns a worker thread so to not block the request thread.
     app.parser.processRawImage(sess, img, imgPath, code, region, index)
     return FormatResponse(ResponseStatus.Ok)
 

@@ -20,7 +20,7 @@ self.onmessage = async(msg) => {
         ctx.drawImage(bmp, 0, 0, 1920, 1080)
     }
 
-    const blob = await cvOff.convertToBlob({type: 'image/jpeg', quality: 0.5 })
+    const blob = await cvOff.convertToBlob({type: 'image/jpeg', quality: 0.9 })
     const form = new FormData()
     {
         form.append('image',   blob, 'IMG')
@@ -32,21 +32,22 @@ self.onmessage = async(msg) => {
         form.append('time',    time)
     }
 
-    const res = await fetch('/api/submit', {
+    const res = fetch('/api/submit', {
         method:  'POST',
         headers: {
             'session': code
         },
         body:    form,
     })
-    const data = await res.json()
+    //const data = await res.json()
 
-    if (data.type != 'ok')
-        console.error(`Could not submit image. Reason: ${data.desc}`)
+    //if (data.type != 'ok')
+    //    console.error(`Could not submit image. Reason: ${data.desc}`)
 
     const e = performance.now();
     const t = e - s;
-    console.log(`Making image took ${t} ms.`)
+    if (t > 100)
+        console.log(`Making image took too long! (${t} ms.)`)
 }
 
 

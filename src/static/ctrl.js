@@ -264,8 +264,9 @@ export class SessionControl {
 
 
     /**
-     * 
-     * @param {*} reason 
+     * @brief switch view to fatal error screen and display the specified error message
+     * @param {*} reason error message to display
+     * @note  The application is put into an unrecoverable state by this function.
      */
     displayFatalError(reason) {
         const errorLabel = document.getElementById('lblFatalErrorDesc')
@@ -333,6 +334,17 @@ export class SessionControl {
             if (this.roleId == activeRole) {
                 this.regRender.endDraw()
 
+                /* Send the ball positions. */
+                await fetch('/api/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'session':      this.sessionCode,
+                        'stage':        this.currStObj.id,
+                        'what':         'pos'
+                    },
+                    body: JSON.stringify(this.regRender.getPositions())
+                })
                 this.regRender = null
             }
         }

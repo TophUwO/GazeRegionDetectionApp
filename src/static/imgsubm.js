@@ -95,7 +95,7 @@ export class ImageSubmitter {
                         facingMode: { 
                             ideal: 'user'
                         },
-                        frameRate: Math.trunc(1000.0 / ival) + 1.0
+                        frameRate: 30
                     }
                 })
                 video.srcObject = stream

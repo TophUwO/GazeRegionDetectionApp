@@ -98,6 +98,11 @@ export class RegionRenderer {
     destroy() {
         this.endDraw()
     }
+
+
+    getPositions() {
+        return this.ball.getPositions()
+    }
 }
 
 
@@ -117,12 +122,22 @@ class Ball {
         this.reg = region
         this.vx  = speed
         this.vy  = speed
+        
+        this.bpos = {}
+        this.idx  = 0
     }
 
 
     /**
      */
     move() {
+        /* Log current ball position as relative to the current region. */
+        this.bpos[this.idx] = {
+            'x': (this.x / window.innerWidth  - this.reg.left) / (this.reg.right  - this.reg.left),
+            'y': (this.y / window.innerHeight - this.reg.top)  / (this.reg.bottom - this.reg.top)
+        }
+        ++this.idx
+
         /* Update position. */
         this.x += this.vx
         this.y += this.vy
@@ -174,6 +189,15 @@ class Ball {
             ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI)
         }
         ctx.fill()
+    }
+
+
+    /**
+     * \brief  retrieves the logged ball positions
+     * \return returns the array holding (K, V)-pairs of ball positions in order
+     */
+    getPositions() {
+        return this.bpos
     }
 }
 

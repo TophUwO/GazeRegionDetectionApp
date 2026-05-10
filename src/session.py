@@ -160,6 +160,8 @@ class SessionManager:
         self._timers     = ThreadPoolExecutor(64)
 
         # Add 'pseudo'-sessions for the ones already created. These are the ones that are already in files/raw.
+        if not exists('files/pos'):
+            makedirs(f'files/pos')
         if exists('files/raw'):
             for ent in listdir('files/raw'):
                 if isdir(ent):
@@ -188,7 +190,7 @@ class SessionManager:
 
         # Create directories.
         makedirs(f'files/raw/{sess.code}')
-        makedirs(f'files/proc/{sess.code}')
+        # makedirs(f'files/proc/{sess.code}')
 
         return sess
 

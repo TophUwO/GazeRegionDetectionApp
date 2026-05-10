@@ -14,6 +14,7 @@ class ResponseStatus(Enum):
     MissingSessionToken = 8
     MalformedRequest    = 9
     CannotCreateSession = 10
+    MalformedJson       = 11
 
 
 def FormatResponse(type: ResponseStatus, payload: dict[str, any] | None = None) -> tuple[Response, int]:
@@ -28,7 +29,8 @@ def FormatResponse(type: ResponseStatus, payload: dict[str, any] | None = None) 
         ResponseStatus.InvalidAuthToken:    ('error', 'Invalid authentication token.',       401),
         ResponseStatus.MissingSessionToken: ('error', 'Missing session token.',              400),
         ResponseStatus.MalformedRequest:    ('error', 'Malformed request.',                  400),
-        ResponseStatus.CannotCreateSession: ('error', 'Cannot create session.',              500)
+        ResponseStatus.CannotCreateSession: ('error', 'Cannot create session.',              500),
+        ResponseStatus.MalformedJson:       ('error', 'Malformed JSON payload.',             400)
     }
     
     try:
