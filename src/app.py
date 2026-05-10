@@ -96,7 +96,7 @@ def disableClientSideCaching(response: Response):
 @app.route('/api/create', methods=['POST'])
 def createSession():
     sess = app.sman.createSession()
-    if sess is None:
+    if sess is None or sess.isFinished == True:
         return FormatResponse(ResponseStatus.CannotCreateSession)
 
     print(f'[SESS#{sess.code}] Opened session.')
@@ -116,7 +116,7 @@ def joinSession():
     
     # Get session.
     sess = app.sman.getSession(code)
-    if sess is None:
+    if sess is None or sess.isFinished == True:
         return FormatResponse(ResponseStatus.SessionNotFound)
     sess.registerClient(app._cfgDict['joinerRole'])
     
@@ -136,7 +136,7 @@ def hookIntoSession():
     
     # Get session.
     sess = app.sman.getSession(code)
-    if sess is None:
+    if sess is None or sess.isFinished == True:
         return FormatResponse(ResponseStatus.SessionNotFound)
     
     # Create hook.
@@ -153,7 +153,7 @@ def advanceStage():
         return FormatResponse(ResponseStatus.InvalidSessionToken)
 
     sess = app.sman.getSession(code)
-    if sess is None:
+    if sess is None or sess.isFinished == True:
         return FormatResponse(ResponseStatus.SessionNotFound)
 
     if not sess.gotoNextStage():
@@ -236,7 +236,7 @@ def handleSSE(code, role):
         abort(400)
 
     sess = app.sman.getSession(code)
-    if sess is None or role not in app._cfgDict['roleIds']:
+    if sess is None or sess.isFinished == True or role not in app._cfgDict['roleIds']:
         abort(404)
     
     q = sess.getQueue(role)
@@ -272,7 +272,7 @@ def handleHookSSE(code):
         abort(400)
 
     sess = app.sman.getSession(code)
-    if sess is None:
+    if sess is None or sess.isFinished == True:
         abort(404)
 
     q = sess.getHookQueue()

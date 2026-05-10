@@ -40,6 +40,7 @@ class Session:
         self.timer   = None
         self.lastIdx = -1
         self.man     = man
+        self.isFinished = False
 
 
     def gotoNextStage(self) -> bool:
@@ -150,7 +151,8 @@ class Session:
         self.sendCommand('any', 'SysCmd_EndSession')
         self.sendCommandToHook('SysCmd_EndSession')
 
-        self.man.deleteSession(self.code)
+        # self.man.deleteSession(self.code)
+        self.isFinished = True
 
 
 class SessionManager:
