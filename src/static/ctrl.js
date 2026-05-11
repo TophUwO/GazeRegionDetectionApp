@@ -38,6 +38,7 @@ export class SessionControl {
         this.currIntermObj  = null
         this.regRender      = null
         this.currStIdx      = -1
+        this.worker         = null
 
         try {
             this.initializeInteractiveElements()
@@ -81,6 +82,9 @@ export class SessionControl {
 
                     codeDispLabel.textContent = `Session Code: ${this.sessionCode}`
                 }
+
+                /* Create worker thread for image submission. This is so that the ball does not lag due to image processing. */
+                this.worker = new Worker('./static/imgmk.js')
 
                 return
             }
@@ -275,6 +279,9 @@ export class SessionControl {
         }
 
         this.switchToView('viewFatalError')
+
+        if (this.worker != null)
+            this.worker.terminate()
         this.destroy()
     }
 
@@ -376,7 +383,7 @@ export class SessionControl {
         this.switchToIntermediateView(IntermediateViewType.READY)
 
         /* Create image submitter component. */
-        this.imgSubmitter = await ImageSubmitter.Create(1920, 1080, this.config.ival)
+        this.imgSubmitter = await ImageSubmitter.Create(1920, 1080, this.config.ival, this.worker)
         {
             if (this.imgSubmitter == null)
                 this.displayFatalError(
@@ -390,7 +397,7 @@ export class SessionControl {
      * 
      */
     async onEndSession() {
-        this.destroy()
+        //this.destroy()
     }
 
 

@@ -8,7 +8,7 @@ export class ImageSubmitter {
      * @param {*} video 
      * @param {*} ival 
      */
-    constructor(canvas, stream, video, ival) {
+    constructor(canvas, stream, video, ival, worker) {
         this.canvas   = canvas
         this.stream   = stream
         this.video    = video
@@ -16,9 +16,7 @@ export class ImageSubmitter {
         this.ival     = ival
         this.stageId  = -1
         this.sessCode = ''
-
-        /* Create worker thread for image creation. This is so that the ball does not lag due to image processing. */
-        this.worker = new Worker('./static/imgmk.js')
+        this.worker   = worker
     }
 
 
@@ -80,7 +78,7 @@ export class ImageSubmitter {
      * @param {*} ival 
      * @returns 
      */
-    static async Create(imgWidth, imgHeight, ival) {
+    static async Create(imgWidth, imgHeight, ival, worker) {
         let stream
 
         const canvas = document.createElement('canvas')
@@ -113,7 +111,7 @@ export class ImageSubmitter {
             canvas.height = video.videoHeight
         }
 
-        return new ImageSubmitter(canvas, stream, video, ival)
+        return new ImageSubmitter(canvas, stream, video, ival, worker)
     }
 }
 
