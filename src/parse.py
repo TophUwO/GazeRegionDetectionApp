@@ -92,6 +92,7 @@ class FaceParser:
         self._lock = Lock()
         self._exec = ThreadPoolExecutor(16)
 
+
     def processRawImage(self, sess, image: bytes, imgPath: str, sessId: str, stId: int, idx: int) -> None:
         def int_actualProcessRawImage(image: bytes, sess, imgPath: str, sessId: str, stId: int, idx: int) -> None:
             # Load image.
@@ -107,6 +108,7 @@ class FaceParser:
             except IndexError:
                 print(f'[SESS#{sessId}] warning: No face detected for stage {stId} (idx: {idx}). Discarding the image.')
 
+                sess.stageStats[stId].nFNoHead += 1
                 sess.sendCommandToHook('Cmd_SubmitError', 'No face detected.')
                 return
             
@@ -116,11 +118,19 @@ class FaceParser:
             if ear_l < 0.25 or ear_r < 0.25:
                 print(f'[SESS#{sessId}] warning: At least one eye closed or nearly closed. Discarding the image.')
 
+                sess.stageStats[stId].nFEyesCl += 1
                 sess.sendCommandToHook('Cmd_SubmitError', 'At least one eye is almost or fully closed.')
                 return
             
             # Save raw image.
-            rawImg.save(imgPath)
+            try:
+                rawImg.save(imgPath)
+
+                sess.stageStats[stId].nSucc += 1
+            except:
+                sess.stageStats[stId].nFOther += 1
+
+                print(f'[SESS#{sessId}] error: Failed to write image file {imgPath}.')
             
         """
             # Calculate bounding boxes.

@@ -24,7 +24,7 @@
                 "objcol": "yellow",
                 "objrad": 20
             },
-            "time":  120,
+            "time":  10,
             "speed": 10
         },
         {
@@ -44,7 +44,7 @@
                 "objcol": "yellow",
                 "objrad": 20
             },
-            "time":  60,
+            "time":  10,
             "speed": 5
         },
         {
@@ -64,7 +64,7 @@
                 "objcol": "yellow",
                 "objrad": 20
             },
-            "time":  150,
+            "time":  10,
             "speed": 10
         },
         {
@@ -74,7 +74,7 @@
                 "text": "In this last stage we collect data for the fourth \"outside of screen\" area. In order to do that, please move your eyes and head freely around the room but make sure to keep your eyes off the screen. There will be no timer on any of the screens. However, when the stage is finished, it will show that on the upper screen. If you need a timer, you can simply set a timer on your phone. The time for this stage is two minutes (120 secs)."
             },
 
-            "time": 120
+            "time": 20
         }
     ]
 }

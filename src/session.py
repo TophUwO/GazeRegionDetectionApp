@@ -18,6 +18,14 @@ class Stage:
     id:        int  = -1
     canSupply: bool = False
 
+@dataclass
+class StageStatistics:
+    nSucc:     int  = 0
+    nFNoHead:  int  = 0
+    nFEyesCl:  int  = 0
+    nFOther:   int  = 0
+
+
 class Client:
     def __init__(self, session: str, role: str):
         self.sessionCode = session,
@@ -32,15 +40,16 @@ class Client:
 
 class Session:
     def __init__(self, man, config, code):
-        self.code    = code
-        self.clients = Pair(None, None)
-        self.hook    = None
-        self.stage   = Stage(-1, False)
-        self.config  = config
-        self.timer   = None
-        self.lastIdx = -1
-        self.man     = man
+        self.code       = code
+        self.clients    = Pair(None, None)
+        self.hook       = None
+        self.stage      = Stage(-1, False)
+        self.config     = config
+        self.timer      = None
+        self.lastIdx    = -1
+        self.man        = man
         self.isFinished = False
+        self.stageStats = [StageStatistics() for i in range(len(self.config['stages']))]
 
 
     def gotoNextStage(self) -> bool:
@@ -151,6 +160,22 @@ class Session:
         self.sendCommand('any', 'SysCmd_EndSession')
         self.sendCommandToHook('SysCmd_EndSession')
 
+        # Write session stats file. */
+        with open(f'files/stats/stats_{self.code}.json', 'w') as f:
+            stats = {}
+            for i, s in zip([i for i in range(0, len(self.config['stages']))], self.stageStats):
+                stats[f'{i}'] = {
+                    'succeeded': s.nSucc,
+                    'failed': {
+                        'nohead':     s.nFNoHead,
+                        'eyesclosed': s.nFEyesCl,
+                        'other':      s.nFOther
+                    }
+                }
+
+            f.write(dumps(stats, indent=4))
+
+        # Do not delete session because there might still be images that need to be processed or received.
         # self.man.deleteSession(self.code)
         self.isFinished = True
 
@@ -162,12 +187,16 @@ class SessionManager:
         self._timers     = ThreadPoolExecutor(64)
 
         # Add 'pseudo'-sessions for the ones already created. These are the ones that are already in files/raw.
-        if not exists('files/pos'):
-            makedirs(f'files/pos')
+        # Also add some global directory that store stuff from all sessions together.
+        if not exists('files/pos'):   makedirs(f'files/pos')
+        if not exists('files/stats'): makedirs(f'files/stats')
         if exists('files/raw'):
             for ent in listdir('files/raw'):
                 if isdir(ent):
                     self.sessionDict[ent] = Session(self, self._config, ent)
+
+                    # Make it so you cannot use that session any longer.
+                    self.sessionDict[ent].isFinished = True
 
 
     def createSession(self) -> Session | None:
@@ -190,9 +219,8 @@ class SessionManager:
             self.sessionDict[sess.code] = sess
             break
 
-        # Create directories.
+        # Create diretory to store raw data.
         makedirs(f'files/raw/{sess.code}')
-        # makedirs(f'files/proc/{sess.code}')
 
         return sess
 
