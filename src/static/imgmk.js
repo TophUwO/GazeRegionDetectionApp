@@ -46,8 +46,8 @@ self.onmessage = async(msg) => {
 
     const e = performance.now();
     const t = e - s;
-    if (t > 100)
-        console.log(`Making image took too long! (${t} ms.)`)
+    //if (t > 100)
+        console.log(`Making image ${idx} took too long! (${t} ms.)`)
 }
 
 
