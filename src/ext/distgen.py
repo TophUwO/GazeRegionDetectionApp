@@ -25,8 +25,8 @@ if __name__ == '__main__':
         for r, d, files in walk(argv[1]):
             for f in files:
                 if f.endswith('.jpg'):
-                    if i == 9000:
-                        raise
+                    #if i == 9000:
+                    #    raise
                 
                     img2Proc.append(r + '/' + f)
                     i += 1
