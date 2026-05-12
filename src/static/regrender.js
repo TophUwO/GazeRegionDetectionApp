@@ -48,13 +48,14 @@ export class RegionRenderer {
             this.ball.draw(ctx, this.cfg.region.objcol)
 
             /* Draw timer inside the current region. */
+            /*
             const currTime = Date.now() / 1000
             {
                 const remMins = Math.trunc((this.cfg.time - (currTime - this.startTime)) / 60)
                 const remSecs = Math.trunc((this.cfg.time - (currTime - this.startTime)) % 60)
                 const remTime = `${String(remMins).padStart(2, '0')}:${String(remSecs).padStart(2, '0')}`
 
-                /* Taken from: https://stackoverflow.com/a/33082682 */
+                // Taken from: https://stackoverflow.com/a/33082682
                 ctx.fillStyle    = 'white'
                 ctx.font         = '36px monospace'
                 ctx.textAlign    = 'center'
@@ -67,6 +68,7 @@ export class RegionRenderer {
                     )
                 }
             }
+            */
         }
 
         this.frame = requestAnimationFrame(this.draw.bind(this))
