@@ -4,11 +4,10 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
+
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.5,
                                   min_tracking_confidence=0.5)
-# cap = cv2.VideoCapture(0)
-
 
 def rotation_matrix_to_angles(rotation_matrix):
     """
@@ -28,7 +27,7 @@ def rotation_matrix_to_angles(rotation_matrix):
 
 
 def EstimatePitchYaw(imfile) -> tuple[float, float]:
-    _, image = cv2.imread(imfile)
+    image = cv2.imread(imfile)
 
     # Convert the color space from BGR to RGB and get Mediapipe results
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
