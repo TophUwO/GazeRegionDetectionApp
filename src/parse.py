@@ -105,7 +105,7 @@ class FaceParser:
             try:
                 with self._lock:
                     res = self._det.detect(mpImg).face_landmarks[0]
-            except IndexError:
+            except:
                 print(f'[SESS#{sessId}] warning: No face detected for stage {stId} (idx: {idx}). Discarding the image.')
 
                 sess.stageStats[stId].nFNoHead += 1

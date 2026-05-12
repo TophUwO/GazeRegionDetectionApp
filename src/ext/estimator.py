@@ -1,3 +1,7 @@
+# This script is based on the one found in here (estimator.py): https://github.com/shenasa-ai/head-pose-estimation
+# All I did was modify the input (no longer webcam but a static image) and add a return value to the function
+# corresponding to the yaw/pitch angles that I want.
+# This has also helped a bit in understanding: https://medium.com/@susanne.thierfelder/head-pose-estimation-with-mediapipe-and-opencv-in-javascript-c87980df3acb
 import math
 
 import cv2

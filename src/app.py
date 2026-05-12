@@ -8,6 +8,7 @@ from json          import loads, dumps
 from os            import getenv
 from jsonschema    import validate
 from queue         import Empty
+from tools.preproc import PreprocessImage
 
 
 # TODO: document the fuck out of this
@@ -50,32 +51,39 @@ class DataCollectionApp(Flask):
     def __init__(self):
         super().__init__(__name__)
 
-        # Read config from env.
-        self._cfgFileName        = getenv('DATACOLL_USED_REGION_CONFIG')
-        self._rawCfgFileContents = ''
-        self._cfgDict            = {}
+        if getenv('DATACOLL_PREPROC', None) is None:
+            # Normal run.
+            # Read config from env.
+            self._cfgFileName        = getenv('DATACOLL_USED_REGION_CONFIG')
+            self._rawCfgFileContents = ''
+            self._cfgDict            = {}
 
-        if not self._cfgFileName or self._cfgFileName == '' or not self._readSessionConfigFile():
-            print(
-                'error: Could not load session configuration file. Set \'DATACOLL_USED_REGION_CONFIG\' to the '
-                'file containing a valid session configuration.'
-            )
+            if not self._cfgFileName or self._cfgFileName == '' or not self._readSessionConfigFile():
+                print(
+                    'error: Could not load session configuration file. Set \'DATACOLL_USED_REGION_CONFIG\' to the '
+                    'file containing a valid session configuration.'
+                )
 
-            exit(1)
+                exit(1)
 
-        # Validate session config.
-        if not self._validateSessionConfig():
-            exit(1)
+            # Validate session config.
+            if not self._validateSessionConfig():
+                exit(1)
 
-        # Initialize sub-components.
-        self.sman   = SessionManager(config=self._cfgDict)
-        self.parser = FaceParser((1920, 1080))
+            # Initialize sub-components.
+            self.sman   = SessionManager(config=self._cfgDict)
+            self.parser = FaceParser((1920, 1080))
 
-        print('info: Initialized application. Ready.')
+            print('info: Initialized application. Ready.')
+        else:
+            # Preprocessing run. Don't initialize.
+            print('info: Running preprocessing. Not starting GazeReg data collection application.')
 
 
 # ps: $env:DATACOLL_USED_REGION_CONFIG="src/conf/mtmsession.json"; $env:DATACOLL_USED_CERT="..."; $env:DATACOLL_USED_KEY="..."; python src/app.py
 # li: DATACOLL_USED_REGION_CONFIG="src/conf/mtmsession.json" DATACOLL_USED_CERT="..." DATACOLL_USED_KEY="..." python src/app.py
+# When preprocessing data:
+    # li: DATACOLL_PREPROC=true python src/app.py
 app = DataCollectionApp()
 
 
@@ -303,19 +311,24 @@ def handleHookSSE(code):
 
 
 if __name__ == "__main__":
-    certFile = getenv('DATACOLL_USED_CERT', None)
-    keyFile  = getenv('DATACOLL_USED_KEY',  None)
+    if getenv('DATACOLL_PREPROC', None) is None:
+        # Normal run.
+        certFile = getenv('DATACOLL_USED_CERT', None)
+        keyFile  = getenv('DATACOLL_USED_KEY',  None)
 
-    if not certFile or not keyFile:
-        print('error: You need to specify a key and a certificate file to use.')
+        if not certFile or not keyFile:
+            print('error: You need to specify a key and a certificate file to use.')
 
-        exit(1)
+            exit(1)
 
-    app.run(
-        host="0.0.0.0",
-        port=8443,
-        threaded=True,
-        ssl_context=(certFile, keyFile),
-    )
+        app.run(
+            host="0.0.0.0",
+            port=8443,
+            threaded=True,
+            ssl_context=(certFile, keyFile),
+        )
+    else:
+        # Preprocess data.
+        PreprocessImage('img_bfbfc5_0_0.jpg')
 
 

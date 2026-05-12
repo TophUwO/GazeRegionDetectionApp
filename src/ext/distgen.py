@@ -1,40 +1,25 @@
 import matplotlib.pyplot as plt
+import datetime          as dt
 
 from sys                import argv
 from estimator          import EstimatePitchYaw
 from os                 import walk
-from concurrent.futures import ThreadPoolExecutor, wait
-
-
-
-data = []
-
-def ProcessImage(img) -> None:
-    pitch, yaw = EstimatePitchYaw(img)
-
-    data.append((pitch, yaw))
-    print(f'   Processed image: {img}; p={pitch}. y={yaw}')
 
 
 if __name__ == '__main__':
-    pool = ThreadPoolExecutor(1)
-
+    # Collect all files that we have to parse.
     i = 1
     img2Proc = []
-    try:
-        for r, d, files in walk(argv[1]):
-            for f in files:
-                if f.endswith('.jpg'):
-                    #if i == 9000:
-                    #    raise
-                
-                    img2Proc.append(r + '/' + f)
-                    i += 1
-    except:
-        pass
+    for r, d, files in walk(argv[1]):
+        for f in files:
+            if f.endswith('.jpg'):
+                img2Proc.append(r + '/' + f)
+
+                i += 1
 
     print(f'Collected {len(img2Proc)} files. Processing ...')
 
+    # Estimate yaw and pitch for all collected images.
     x = []
     y = []
     for j, f in zip([j for j in range(i)], img2Proc):
@@ -46,12 +31,12 @@ if __name__ == '__main__':
 
     # Generate 2D histogram.
     print('Generating histogram.')
-    plt.hist2d(x, y, bins=50, cmap='viridis')
+    plt.hist2d(x, y, bins=70, cmap='magma')
 
-    plt.xlabel("Yaw [deg]")
-    plt.ylabel("Pitch [deg]")
-    plt.colorbar(label="Count")
-    plt.savefig("output.png", dpi=300, bbox_inches="tight")
+    plt.xlabel('Yaw [deg]')
+    plt.ylabel('Pitch [deg]')
+    plt.colorbar(label='Count')
+    plt.savefig(f'GazeReg_HeadPoseDist_{dt.datetime.now().strftime('%Y-%m-%d')}.png', dpi=300, bbox_inches='tight')
 
 
     
