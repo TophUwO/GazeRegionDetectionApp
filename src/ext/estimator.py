@@ -65,7 +65,7 @@ def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
             # Use solvePnP function to get rotation vector
             success, rotation_vec, transition_vec = cv2.solvePnP(
                 face_coordination_in_real_world, face_coordination_in_image,
-                cmtx, dist)
+                ncmtx, dist)
 
             # Use Rodrigues function to convert rotation vector to matrix
             rotation_matrix, jacobian = cv2.Rodrigues(rotation_vec)
