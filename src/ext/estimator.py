@@ -33,10 +33,6 @@ def rotation_matrix_to_angles(rotation_matrix):
 def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
     # Load and undistort.
     image = cv2.imread(imfile)
-    image = cv2.undistort(image, cmtx, dist, None, ncmtx)
-    # Crop.
-    # x, y, w, h = roi
-    # image = image[y:y+h, x:x+w]
 
     # Convert the color space from BGR to RGB and get Mediapipe results.
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -69,7 +65,7 @@ def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
             # Use solvePnP function to get rotation vector
             success, rotation_vec, transition_vec = cv2.solvePnP(
                 face_coordination_in_real_world, face_coordination_in_image,
-                cmtx, np.zeros((5, 1)))
+                cmtx, dist)
 
             # Use Rodrigues function to convert rotation vector to matrix
             rotation_matrix, jacobian = cv2.Rodrigues(rotation_vec)
