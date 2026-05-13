@@ -83,7 +83,7 @@ def CalibrateCamera(imgdir, dbg) -> int:
     for i in range(len(objPts)):
         imgpoints2, _ = cv2.projectPoints(objPts[i], rv[i], tv[i], mtx, dist)
 
-        error = cv2.norm(objPts[i], imgpoints2, cv2.NORM_L2)/len(imgpoints2)
+        error = cv2.norm(imgPts[i], imgpoints2, cv2.NORM_L2)/len(imgpoints2)
         mean_error += error
 
     print(f'Reprojection error: {mean_error/len(objPts)}')
