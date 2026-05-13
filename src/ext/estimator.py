@@ -56,7 +56,7 @@ def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
         for face_landmarks in results.multi_face_landmarks:
             for idx, lm in enumerate(face_landmarks.landmark):
                 if idx in [1, 9, 57, 130, 287, 359]:
-                    x, y = int(lm.x * w), int(lm.y * h)
+                    x, y = lm.x * w, lm.y * h
                     face_coordination_in_image.append([x, y])
 
             face_coordination_in_image = np.array(face_coordination_in_image,
