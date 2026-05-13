@@ -30,15 +30,17 @@ def rotation_matrix_to_angles(rotation_matrix):
 
 
 
-def EstimatePitchYaw(imfile) -> tuple[float, float]:
+def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
+    # Load and undistort.
     image = cv2.imread(imfile)
+    image = cv2.undistort(image, cmtx, dist, None, ncmtx)
+    # Crop.
+    x, y, w, h = roi
+    image = image[y:y+h, x:x+w]
 
-    # Convert the color space from BGR to RGB and get Mediapipe results
+    # Convert the color space from BGR to RGB and get Mediapipe results.
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     results = face_mesh.process(image)
-
-    # Convert the color space from RGB to BGR to display well with Opencv
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
     face_coordination_in_real_world = np.array([
         [285, 528, 200],
@@ -64,19 +66,10 @@ def EstimatePitchYaw(imfile) -> tuple[float, float]:
             face_coordination_in_image = np.array(face_coordination_in_image,
                                                   dtype=np.float64)
 
-            # The camera matrix
-            focal_length = 1 * w
-            cam_matrix = np.array([[focal_length, 0, w / 2],
-                                   [0, focal_length, h / 2],
-                                   [0, 0, 1]])
-
-            # The Distance Matrix
-            dist_matrix = np.zeros((4, 1), dtype=np.float64)
-
             # Use solvePnP function to get rotation vector
             success, rotation_vec, transition_vec = cv2.solvePnP(
                 face_coordination_in_real_world, face_coordination_in_image,
-                cam_matrix, dist_matrix)
+                cmtx, dist)
 
             # Use Rodrigues function to convert rotation vector to matrix
             rotation_matrix, jacobian = cv2.Rodrigues(rotation_vec)

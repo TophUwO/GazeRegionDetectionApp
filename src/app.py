@@ -329,6 +329,6 @@ if __name__ == "__main__":
         )
     else:
         # Preprocess data.
-        PreprocessImage('img_bfbfc5_0_0.jpg')
+        PreprocessImage('dest.jpg')
 
 

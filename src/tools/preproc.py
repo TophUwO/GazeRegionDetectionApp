@@ -1,7 +1,7 @@
 import cv2
 
 from os                     import getenv
-from numpy                  import array
+from numpy                  import array, load
 from mediapipe.tasks        import python
 from mediapipe.tasks.python import vision
 
@@ -37,7 +37,15 @@ def PreprocessImage(img) -> None:
     # (1) Load image.
     im = cv2.imread(img)
 
-    # (2) Undistort.
+    # (2.1) Undistort.
+    cmtx = load('ccres/cam.npy')
+    dist = load('ccres/dist.npy')
+    ncam = load('ccres/ncam.npy')
+    roi  = load('ccres/roi.npy')
+    im   = cv2.undistort(im, cmtx, dist, None, ncam)
+    # (2.2) Crop.
+    x, y, w, h = roi
+    im   = im[y:y+h, x:x+w]
     
     # (3) Extract eyes and the landmarks we want.
     lm = None
@@ -58,4 +66,3 @@ def PreprocessImage(img) -> None:
 
     # (6) Save.
 
-    

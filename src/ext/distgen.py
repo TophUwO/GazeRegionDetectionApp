@@ -4,6 +4,7 @@ import datetime          as dt
 from sys                import argv
 from estimator          import EstimatePitchYaw
 from os                 import walk
+from numpy              import load
 
 
 if __name__ == '__main__':
@@ -19,11 +20,17 @@ if __name__ == '__main__':
 
     print(f'Collected {len(img2Proc)} files. Processing ...')
 
+    # Get camera calibration results.
+    cmtx  = load('ccres/cam.npy')
+    ncmtx = load('ccres/ncam.npy')
+    dist  = load('ccres/dist.npy')
+    roi   = load('ccres/roi.npy')
+
     # Estimate yaw and pitch for all collected images.
     x = []
     y = []
     for j, f in zip([j for j in range(i)], img2Proc):
-        pitch, yaw = EstimatePitchYaw(f)
+        pitch, yaw = EstimatePitchYaw(f, cmtx, ncmtx, dist, roi)
 
         x.append(yaw)
         y.append(pitch)
@@ -31,7 +38,7 @@ if __name__ == '__main__':
 
     # Generate 2D histogram.
     print('Generating histogram.')
-    plt.hist2d(x, y, bins=70, cmap='magma')
+    plt.hist2d(x, y, bins=50, cmap='viridis')
 
     plt.xlabel('Yaw [deg]')
     plt.ylabel('Pitch [deg]')
