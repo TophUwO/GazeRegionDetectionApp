@@ -1,17 +1,14 @@
-# This script is based on the one found in here (estimator.py): https://github.com/shenasa-ai/head-pose-estimation
-# All I did was modify the input (no longer webcam but a static image) and add a return value to the function
-# corresponding to the yaw/pitch angles that I want.
-# This has also helped a bit in understanding: https://medium.com/@susanne.thierfelder/head-pose-estimation-with-mediapipe-and-opencv-in-javascript-c87980df3acb
 import math
 
 import cv2
 import mediapipe as mp
 import numpy as np
 
-
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.5,
                                   min_tracking_confidence=0.5)
+cap = cv2.VideoCapture(0)
+
 
 def rotation_matrix_to_angles(rotation_matrix):
     """
@@ -29,18 +26,24 @@ def rotation_matrix_to_angles(rotation_matrix):
     return np.array([x, y, z]) * 180. / math.pi
 
 
+cmtx  = np.load('ccres/cam.npy')
+ncmtx = np.load('ccres/ncam.npy')
+dist  = np.load('ccres/dist.npy')
+roi   = np.load('ccres/roi.npy')
 
-def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
-    # Load and undistort.
-    image = cv2.imread(imfile)
-    image = cv2.undistort(image, cmtx, dist, None, ncmtx)
-    # Crop.
-    # x, y, w, h = roi
-    # image = image[y:y+h, x:x+w]
 
-    # Convert the color space from BGR to RGB and get Mediapipe results.
+while cap.isOpened():
+    success, image = cap.read()
+
+    # Convert the color space from BGR to RGB and get Mediapipe results
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = cv2.undistort(image, cmtx, dist, None, ncmtx)
+    x, y, w, h = roi
+    image = image[y:y+h, x:x+w]
     results = face_mesh.process(image)
+
+    # Convert the color space from RGB to BGR to display well with Opencv
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
     face_coordination_in_real_world = np.array([
         [285, 528, 200],
@@ -54,8 +57,6 @@ def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
     h, w, _ = image.shape
     face_coordination_in_image = []
 
-    yaw   = 0.0
-    pitch = 0.0
     if results.multi_face_landmarks:
         for face_landmarks in results.multi_face_landmarks:
             for idx, lm in enumerate(face_landmarks.landmark):
@@ -75,9 +76,17 @@ def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
             rotation_matrix, jacobian = cv2.Rodrigues(rotation_vec)
 
             result = rotation_matrix_to_angles(rotation_matrix)
-            pitch = result[0]
-            yaw   = result[1]
+            for i, info in enumerate(zip(('pitch', 'yaw', 'roll'), result)):
+                k, v = info
+                text = f'{k}: {int(v)}'
+                cv2.putText(image, text, (20, i*30 + 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 0, 200), 2)
 
-    return pitch, yaw
 
+    cv2.imshow('Head Pose Angles', image)
+
+    if cv2.waitKey(5) & 0xFF == 27:
+        break
+
+cap.release()
 
