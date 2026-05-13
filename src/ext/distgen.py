@@ -36,7 +36,7 @@ if __name__ == '__main__':
     plt.xlabel('Yaw [deg]')
     plt.ylabel('Pitch [deg]')
     plt.colorbar(label='Count')
-    plt.savefig(f'GazeReg_HeadPoseDist_{dt.datetime.now().strftime('%Y-%m-%d')}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'GazeReg_HeadPoseDist_{dt.datetime.now().strftime("%Y-%m-%d")}.png', dpi=300, bbox_inches='tight')
 
 
     
