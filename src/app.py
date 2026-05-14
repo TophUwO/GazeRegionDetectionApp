@@ -8,7 +8,9 @@ from json          import loads, dumps
 from os            import getenv
 from jsonschema    import validate
 from queue         import Empty
-from tools.preproc import PreprocessImage
+# from tools.preproc import PreprocessImage_Simple, PreprocessImage_LikeMPIIGaze
+
+# import cv2
 
 
 # TODO: document the fuck out of this
@@ -327,8 +329,10 @@ if __name__ == "__main__":
             threaded=True,
             ssl_context=(certFile, keyFile),
         )
-    else:
-        # Preprocess data.
-        PreprocessImage('dest.jpg')
+    #else:
+        # PreprocessImage('img_97b082_2_1200.jpg')
+        # l = PreprocessImage_LikeMPIIGaze('files/test/img_3cf9f8_0_945.jpg')
+        # for i, x in enumerate(l):
+        #    cv2.imwrite(f'image_{i}_w.jpg', x)
 
 
