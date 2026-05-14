@@ -244,6 +244,8 @@ if __name__ == '__main__':
             eyes = PreprocessImage_LikeMPIIGaze(n)
         else:
             eyes = PreprocessImage_Simple(n)
+        if not eyes:
+            continue
 
         # Write.
         if s not in listing['sessions']:
