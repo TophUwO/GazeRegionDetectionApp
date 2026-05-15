@@ -5,12 +5,13 @@ import torch as pytorch
 
 from os.path          import join
 from json             import load
-from torch            import tensor, float32, long, device, nn
+from torch            import tensor, float32, long, device, nn, softmax
 from torch.optim      import Adam
 from torch.cuda       import is_available
 from torch.utils.data import Dataset, DataLoader
 from sys              import argv
 from tqdm             import tqdm
+from random           import sample
 
 from model            import GazeRegEyeModel
 
@@ -37,6 +38,8 @@ class GazeRegDataset(Dataset):
 
             self._trainData.extend(v)
 
+        # self._trainData = sample(self._trainData, 1000)
+
         print(f'Training set: {trainSess}/{self._nSessions}, {len(self._trainData)} items.')
 
 
@@ -50,7 +53,9 @@ class GazeRegDataset(Dataset):
         l = tensor(np.load(join(self._dir, ln)), dtype=float32).unsqueeze(0) / 255
         r = tensor(np.load(join(self._dir, rn)), dtype=float32).unsqueeze(0) / 255
         y = tensor(lbl, dtype=long)
+        # print(l.min(), l.max(), l.mean(), y)
 
+        # print(f'{ln}, {rn}, {lbl}')
         return l, r, y
     
 
@@ -59,7 +64,7 @@ if __name__ == '__main__':
     dir  = argv[2]
     save = '-s' in argv or '--save' in argv
 
-    epochs = 100
+    epochs = 10
     batch  = 32
     crit   = nn.CrossEntropyLoss()
 
@@ -82,7 +87,10 @@ if __name__ == '__main__':
             opt.zero_grad()
 
             res = mdl(l, r)
+            # print(softmax(res, dim=1)[:5])
+            # print("logits mean/std:", res.mean().item(), res.std().item())
             currLoss = crit(res, y)
+            # print("batch loss example:", currLoss.item())
 
             currLoss.backward()
             opt.step()
@@ -91,6 +99,9 @@ if __name__ == '__main__':
 
         avgLoss = loss / len(ld)
         print(f"Epoch {e+1}: avg loss = {avgLoss:.4f}")
+
+    print("FINAL avg loss:", avgLoss)
+    print("RAW accumulated loss:", loss)
 
     print('Finished training.')
     if save:

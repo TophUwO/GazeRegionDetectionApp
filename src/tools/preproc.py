@@ -126,7 +126,12 @@ def PreprocessImage_LikeMPIIGaze(imfile) -> list[array]:
         print(f'warning: Image "{imfile}" does not contain a face. Skipping.')
 
         return None
-    lm = lm.multi_face_landmarks[0].landmark
+    try:
+        lm = lm.multi_face_landmarks[0].landmark
+    except:
+        print(f'warning: Image "{imfile}" does not contain a face. Skipping.')
+
+        return None
     im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
 
     h, w = im.shape[:2]
