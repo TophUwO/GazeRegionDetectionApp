@@ -12,6 +12,13 @@ from threading              import Lock
 from concurrent.futures     import ThreadPoolExecutor
 
 from dlmdl                  import DownloadFaceLandmarkerModelBundle
+from tools.estimator        import EstimatePitchYawRoll
+from numpy                  import load
+
+
+CMTX = load('ccres/cam.npy')
+DIST = load('ccres/dist.npy')
+NCAM = load('ccres/ncam.py')
 
 
 class EntityId(Enum):
@@ -126,32 +133,17 @@ class FaceParser:
             try:
                 rawImg.save(imgPath)
 
+                p, y, r = EstimatePitchYawRoll(imgPath, CMTX, NCAM, DIST)
+
+                sess.sendCommandToHook('Cmd_SubmitError', f'Attitude: Y = {y}, P = {p}, R = {r}')
                 sess.stageStats[stId].nSucc += 1
             except:
                 sess.stageStats[stId].nFOther += 1
 
                 print(f'[SESS#{sessId}] error: Failed to write image file {imgPath}.')
-            
-        """
-            # Calculate bounding boxes.
-            fbbox  = Internal_GetEntityBoundingBox(EntityId.FACE, res).scale(self._size).pad((250, 250, 250, 250))
-            lebbox = Internal_GetEntityBoundingBox(EntityId.LEFT, res).scale(self._size).pad((40, 40, 40, 40))
-            rebbox = Internal_GetEntityBoundingBox(EntityId.RIGHT, res).scale(self._size).pad((40, 40, 40, 40))
-
-            # Crop face, left eye, and right eye.
-            faceCrop = rawImg.crop(fbbox.tuple()).resize((512, 512))
-            leCrop   = rawImg.crop(lebbox.tuple()).resize((256, 256))
-            reCrop   = rawImg.crop(rebbox.tuple()).resize((256, 256))
-            # Save results.
-            rawImg.save(imgPath)
-            faceCrop.save(f'files/proc/{sessId}/face_{sessId}_{stId}_{idx}.jpg')
-            leCrop.save(f'files/proc/{sessId}/left_{sessId}_{stId}_{idx}.jpg')
-            reCrop.save(f'files/proc/{sessId}/right_{sessId}_{stId}_{idx}.jpg')
-        """
 
         # Spawn a thread that does the actual processing in order not to overload the request handler. Doing the
-        # processing on the same thread as the request blocks one of the Flask workers. If all workers are blocked, then
-        # images may be dropped.
+        # processing on the same thread as the request blocks one of the Flask workers.
         self._exec.submit(int_actualProcessRawImage, image, sess, imgPath, sessId, stId, idx)
 
 
@@ -175,35 +167,5 @@ def Internal_CalcEAR(lm: list) -> tuple[float, float]:
         if i == 1: rightEAR = EAR
 
     return leftEAR, rightEAR
-
-
-"""
-def Internal_GetEntityBoundingBox(id: EntityId, landmarks: list) -> BoundingBox:
-    # Taken from: https://gist.github.com/Asadullah-Dal17/fd71c31bac74ee84e6a31af50fa62961
-    LEFT_EYE  = [ 362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398 ]
-    RIGHT_EYE = [  33,   7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246 ]
-    FACE      = [ 
-        10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 
-        150, 136, 172,  58, 132,  93, 234, 127, 162,  21,  54, 103,  67, 109
-    ]
-
-    # Determine the set of landmarks to iterate over.
-    targetLandmarks = []
-    match id:
-        case EntityId.FACE:  targetLandmarks = FACE
-        case EntityId.LEFT:  targetLandmarks = LEFT_EYE
-        case EntityId.RIGHT: targetLandmarks = RIGHT_EYE
-
-    res = BoundingBox.Null()
-    for lmIdx in targetLandmarks:
-        lm = landmarks[lmIdx]
-
-        res.left   = min(res.left,   lm.x)
-        res.top    = min(res.top,    lm.y)
-        res.right  = max(res.right,  lm.x)
-        res.bottom = max(res.bottom, lm.y)
-
-    return res
-"""
 
 

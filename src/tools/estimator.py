@@ -30,7 +30,7 @@ def rotation_matrix_to_angles(rotation_matrix):
 
 
 
-def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
+def EstimatePitchYawRoll(imfile, cmtx, ncmtx, dist, roi = None) -> tuple[float, float]:
     # Load and undistort.
     image = cv2.imread(imfile)
     image = cv2.undistort(image, cmtx, dist, None, ncmtx)
@@ -53,6 +53,7 @@ def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
 
     yaw   = 0.0
     pitch = 0.0
+    roll  = 0.0
     if results.multi_face_landmarks:
         for face_landmarks in results.multi_face_landmarks:
             for idx, lm in enumerate(face_landmarks.landmark):
@@ -74,7 +75,8 @@ def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
             result = rotation_matrix_to_angles(rotation_matrix)
             pitch = result[0]
             yaw   = result[1]
+            roll  = result[2]
 
-    return pitch, yaw
+    return pitch, yaw, roll
 
 

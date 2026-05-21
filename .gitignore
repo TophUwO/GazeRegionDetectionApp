@@ -8,3 +8,8 @@
 *.pem
 *.exe
 *.p12
+*.zip
+*.json
+/preproc_real/
+/preproc_real2/
+/preproc_real444/

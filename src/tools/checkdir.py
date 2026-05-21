@@ -9,4 +9,6 @@ if __name__ == '__main__':
         if file.endswith('.jpg') and not path.exists(dir + file.replace('img', 'lbl').replace('.jpg', '.json')):
             print(f'error: Image "{file}" has no corresponding label.')
 
+    exit(0)
+
 
