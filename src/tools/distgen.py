@@ -10,15 +10,21 @@ from re                 import match
 
 
 if __name__ == '__main__':
+    reg = -1 if len(argv) < 2 else argv[1]
+
     # Collect all files that we have to parse.
     i = 1
     img2Proc = []
     for r, d, files in walk(argv[1]):
         for f in files:
-            if f.endswith('.jpg'):
-                img2Proc.append(r + '/' + f)
+            if reg == -1:
+                if f.endswith('.jpg'):
+                    img2Proc.append(r + '/' + f)
 
-                i += 1
+                    i += 1
+            #else:
+                #if match
+
 
 
     print(f'Collected {len(img2Proc)} files. Processing ...')

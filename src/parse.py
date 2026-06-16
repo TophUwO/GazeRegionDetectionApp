@@ -13,8 +13,9 @@ from threading              import Lock
 from concurrent.futures     import ThreadPoolExecutor
 
 # TODO: Use face landmarker.
-from dlmdl import DownloadFaceLandmarkerModelBundle
-from numpy import load
+from dlmdl           import DownloadFaceLandmarkerModelBundle
+from tools.estimator import EstimatePitchYawRoll
+from numpy           import load
 
 
 # Get the camera parameters for undistortion.
@@ -145,6 +146,9 @@ class FaceParser:
             try:
                 rawImg.save(imgPath)
 
+                p, y, r = EstimatePitchYawRoll(imgPath, CMTX, NCAM, DIST)
+                # Simply send the y, p, r to the hook client for debugging purposes.
+                sess.sendCommandToHook('Cmd_SubmitError', f'Attitude: Y = {y}, P = {p}, R = {r}')
                 sess.stageStats[stId].nSucc += 1
             except:
                 sess.stageStats[stId].nFOther += 1

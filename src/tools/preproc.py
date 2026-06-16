@@ -305,6 +305,32 @@ def Preprocess_OnlyFace(flm: FaceLandmarker, imfile, eq = False) -> array:
     return im
 
 
+def Preprocess_OnlyFace(imfile, eq = False) -> array:
+    im = cv2.imread(imfile)
+    im = cv2.undistort(im, CMTX, DIST)
+
+    lm = FACE_MESH.process(im)
+    if lm is None:
+        print(f'warning: Image "{imfile}" does not contain a face. Skipping.')
+
+        return None
+    try:
+        lm = lm.multi_face_landmarks[0].landmark
+    except:
+        print(f'warning: Image "{imfile}" does not contain a face. Skipping.')
+
+        return None
+    im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+
+    l, t, r, b = int_GetFaceBoundingBox(lm)
+    im = im[int(t*S[1]):int(b*S[1]), int(l*S[0]):int(r*S[0])]
+
+    if eq:
+        im = cv2.equalizeHist(im)
+
+    return im
+
+
 if __name__ == '__main__':
     src   = argv[1] # source directory
     dst   = argv[2] # destination directory
