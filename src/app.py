@@ -8,16 +8,11 @@ from json          import loads, dumps
 from os            import getenv
 from jsonschema    import validate
 from queue         import Empty
-# from tools.preproc import PreprocessImage_Simple, PreprocessImage_LikeMPIIGaze
-
-# import cv2
 
 
-# TODO: document the fuck out of this
-# TODO: schema
-
-
+# Data collection app.
 class DataCollectionApp(Flask):
+    # Read session config.
     def _readSessionConfigFile(self) -> bool:
         try:
             with open(self._cfgFileName) as fp:
@@ -31,6 +26,7 @@ class DataCollectionApp(Flask):
         return True
     
     def _validateSessionConfig(self) -> bool:
+        # TODO: Create JSON schema and validate.
         CONFIG_SCHEMA = r'''
             {
 
@@ -53,44 +49,38 @@ class DataCollectionApp(Flask):
     def __init__(self):
         super().__init__(__name__)
 
-        if getenv('DATACOLL_PREPROC', None) is None:
-            # Normal run.
-            # Read config from env.
-            self._cfgFileName        = getenv('DATACOLL_USED_REGION_CONFIG')
-            self._rawCfgFileContents = ''
-            self._cfgDict            = {}
+        # Read config from env.
+        self._cfgFileName        = getenv('DATACOLL_USED_REGION_CONFIG')
+        self._rawCfgFileContents = ''
+        self._cfgDict            = {}
 
-            if not self._cfgFileName or self._cfgFileName == '' or not self._readSessionConfigFile():
-                print(
+        if not self._cfgFileName or self._cfgFileName == '' or not self._readSessionConfigFile():
+            print(
                     'error: Could not load session configuration file. Set \'DATACOLL_USED_REGION_CONFIG\' to the '
-                    'file containing a valid session configuration.'
-                )
+            'file containing a valid session configuration.'
+            )
 
-                exit(1)
+            exit(1)
 
-            # Validate session config.
-            if not self._validateSessionConfig():
-                exit(1)
+        # Validate session config.
+        if not self._validateSessionConfig():
+            exit(1)
 
-            # Initialize sub-components.
-            self.sman   = SessionManager(config=self._cfgDict)
-            self.parser = FaceParser((1920, 1080))
+        # Initialize sub-components.
+        self.sman   = SessionManager(config=self._cfgDict)
+        self.parser = FaceParser((1920, 1080))
 
-            print('info: Initialized application. Ready.')
-        else:
-            # Preprocessing run. Don't initialize.
-            print('info: Running preprocessing. Not starting GazeReg data collection application.')
+        print('info: Initialized application. Ready.')
 
 
 # ps: $env:DATACOLL_USED_REGION_CONFIG="src/conf/mtmsession.json"; $env:DATACOLL_USED_CERT="..."; $env:DATACOLL_USED_KEY="..."; python src/app.py
 # li: DATACOLL_USED_REGION_CONFIG="src/conf/mtmsession.json" DATACOLL_USED_CERT="..." DATACOLL_USED_KEY="..." python src/app.py
-# When preprocessing data:
-    # li: DATACOLL_PREPROC=true python src/app.py
 app = DataCollectionApp()
 
 
 @app.route('/')
 def index():
+    # Give them the session config when they connect.
     return render_template('index.html', GL_SESSION_CONFIG=app._cfgDict)
 
 @app.after_request
@@ -130,7 +120,7 @@ def joinSession():
         return FormatResponse(ResponseStatus.SessionNotFound)
     sess.registerClient(app._cfgDict['joinerRole'])
     
-    # All good.
+    # All good. Session ready.
     sess.sendCommand(app._cfgDict['creatorRole'], 'Cmd_Ready')
     sess.sendCommandToHook('Cmd_Ready')
     return FormatResponse(ResponseStatus.Ok, {
@@ -201,10 +191,6 @@ def saveImage():
             return FormatResponse(ResponseStatus.MalformedJson)
         
         return FormatResponse(ResponseStatus.Ok)
-    # elif not sess.stage.canSupply:
-    #   sess.sendCommandToHook('Cmd_SubmitError', 'Cannot supply images')
-
-    #    return FormatResponse(ResponseStatus.CannotSupplyImages)
 
     # Case 2: Image submission. Do some preprocessing and save.
     form   = None
@@ -235,7 +221,7 @@ def saveImage():
     with open(lblPath, 'w') as labelFile:
         labelFile.write(LabelGenerator.GenerateLabel(imgPath, code, index, region, x, y, time))
 
-    # Do some basic checking on the image and save it. This spawns a worker thread so to not block the request thread.
+    # Do some basic checking on the image and save it. This spawns a worker thread as to not block the request thread.
     app.parser.processRawImage(sess, img, imgPath, code, region, index)
     return FormatResponse(ResponseStatus.Ok)
 
@@ -262,6 +248,7 @@ def handleSSE(code, role):
                 if message == 'SysCmd_EndSession':
                     return
             except Empty:
+                # For some reason, I got weird disconnects without this.
                 yield ': __HEATBEAT__\n\n'
 
                 continue
@@ -297,6 +284,7 @@ def handleHookSSE(code):
                 if message == 'SysCmd_EndSession':
                     return
             except Empty:
+                # For some reason, I got weird disconnects without this.
                 yield ': __HEATBEAT__\n\n'
 
                 continue
@@ -313,26 +301,20 @@ def handleHookSSE(code):
 
 
 if __name__ == "__main__":
-    if getenv('DATACOLL_PREPROC', None) is None:
-        # Normal run.
-        certFile = getenv('DATACOLL_USED_CERT', None)
-        keyFile  = getenv('DATACOLL_USED_KEY',  None)
+    # Normal run.
+    certFile = getenv('DATACOLL_USED_CERT', None)
+    keyFile  = getenv('DATACOLL_USED_KEY',  None)
 
-        if not certFile or not keyFile:
-            print('error: You need to specify a key and a certificate file to use.')
+    if not certFile or not keyFile:
+        print('error: You need to specify a key and a certificate file to use.')
 
-            exit(1)
+        exit(1)
 
-        app.run(
-            host="0.0.0.0",
-            port=8443,
-            threaded=True,
-            ssl_context=(certFile, keyFile),
-        )
-    #else:
-        # PreprocessImage('img_97b082_2_1200.jpg')
-        # l = PreprocessImage_LikeMPIIGaze('files/test/img_3cf9f8_0_945.jpg')
-        # for i, x in enumerate(l):
-        #    cv2.imwrite(f'image_{i}_w.jpg', x)
+    app.run(
+        host="0.0.0.0",
+        port=8443,
+        threaded=True,
+        ssl_context=(certFile, keyFile),
+    )
 
 

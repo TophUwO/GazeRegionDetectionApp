@@ -1,3 +1,4 @@
+# Error manager for data coll app.
 from enum  import Enum
 from flask import Response, jsonify
 
@@ -17,6 +18,7 @@ class ResponseStatus(Enum):
     MalformedJson       = 11
 
 
+# Format response so that it is in a form the frontend understands.
 def FormatResponse(type: ResponseStatus, payload: dict[str, any] | None = None) -> tuple[Response, int]:
     GL_ERRORDICT: dict[ResponseStatus, tuple[str, str, int]] = {
         ResponseStatus.Ok:                  ('ok',    'no error',                            200),

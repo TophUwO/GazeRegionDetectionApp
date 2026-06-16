@@ -1,4 +1,4 @@
-# Old eval script, needs to be updated.
+# Eval as normal.
 from sys              import argv
 from tqdm             import tqdm
 from torch.utils.data import DataLoader
@@ -8,35 +8,8 @@ from json             import dumps
 from datetime         import datetime
 
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-from train           import GazeRegDataset
+from tools.train     import GazeRegDataset
 from model           import *
-
-
-def int_GetModelType(mdlfile: str) -> tuple[int, type]:
-    i = int(mdlfile)
-
-    match i:
-        case 1:
-            return i, GazeRegEyeModel1
-        case 2:
-            return i, GazeRegEyeModel2
-        case 3:
-            return i, GazeRegEyeModel3
-        case 4:
-            return i, GazeRegEyeModel4
-        case 5:
-            return i, GazeRegEyeModel5
-        case 6:
-            return i, GazeRegEyeModel6
-        case 7:
-            return i, GazeRegEyeModel7
-        case 10:
-            return i, GazeRegEyeModel10
-        
-        case 103:
-            return i, GazeRegEyeModel103
-        
-    return i, None
 
 
 if __name__ == '__main__':
@@ -49,13 +22,13 @@ if __name__ == '__main__':
     confmtx = '-c' in argv or '--confusion' in argv
     jsres   = '-j' in argv or '--jsonres'   in argv
 
-    __i, __t = int_GetModelType(id)
+    __i, __t = 100, GazeRegModel
     new = __i >= 100
 
-    ds  = GazeRegDataset(cfg, data, new, (0.8, 0.2), not istr)
+    ds  = GazeRegDataset(cfg, data, True, (0.8, 0.2), eval=True)
     dl  = DataLoader(ds, batch_size=32)
     dev = device('cuda' if is_available() else 'cpu')
-    mdl = __t().to(dev)
+    mdl = __t(merged=False).to(dev)
     mdl.load_state_dict(load(mdlfile, map_location=dev))
     mdl.eval()
 
@@ -109,7 +82,7 @@ if __name__ == '__main__':
     # (4) If desired, generate confusion matrix.
     if confmtx:
         fname = f'Eval_ConfMtx_{"Tr" if istr else "Ev"}_{"N" if new else ""}{__i}_{dt}.png'
-        mtx   = confusion_matrix(y_real, y_pred, labels=[0, 1, 2, 3])
+        mtx   = confusion_matrix(y_real, y_pred, labels=[0, 1, 2, 3], normalize='true')
 
         disp = ConfusionMatrixDisplay(confusion_matrix=mtx)
         disp.plot().figure_.savefig(fname, dpi=300)
@@ -117,9 +90,6 @@ if __name__ == '__main__':
         print(f'Confusion matrix has been saved under "{fname}".')
 
     exit(0)
-
-
-    
 
 
         

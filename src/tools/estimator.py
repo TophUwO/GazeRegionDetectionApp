@@ -5,13 +5,13 @@
 import math
 
 import cv2
-import mediapipe as mp
 import numpy as np
 
+from tools.facelm import FaceLandmarker
 
-mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.5,
-                                  min_tracking_confidence=0.5)
+
+#mp_face_mesh = mp.solutions.face_mesh
+#face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
 def rotation_matrix_to_angles(rotation_matrix):
     """
@@ -30,14 +30,16 @@ def rotation_matrix_to_angles(rotation_matrix):
 
 
 
-def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
-    # Load and undistort.
-    image = cv2.imread(imfile)
-    image = cv2.undistort(image, cmtx, dist, None, ncmtx)
-
-    # Convert the color space from BGR to RGB and get Mediapipe results.
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    results = face_mesh.process(image)
+def EstimatePitchYawRoll(lms, imfile, cmtx, ncmtx, dist, roi = None) -> tuple[float, float]:
+    if isinstance(imfile, str):
+        # Load and undistort.
+        image = cv2.imread(imfile)
+        image = cv2.undistort(image, cmtx, dist, None, ncmtx)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        im    = image
+    else:
+        # OpenCV image.
+        im = imfile
 
     face_coordination_in_real_world = np.array([
         [285, 528, 200],
@@ -48,33 +50,26 @@ def EstimatePitchYaw(imfile, cmtx, ncmtx, dist, roi) -> tuple[float, float]:
         [391, 425, 108]
     ], dtype=np.float64)
 
-    h, w, _ = image.shape
+    h, w, _ = im.shape
     face_coordination_in_image = []
 
     yaw   = 0.0
     pitch = 0.0
-    if results.multi_face_landmarks:
-        for face_landmarks in results.multi_face_landmarks:
-            for idx, lm in enumerate(face_landmarks.landmark):
-                if idx in [1, 9, 57, 130, 287, 359]:
-                    x, y = lm.x * w, lm.y * h
-                    face_coordination_in_image.append([x, y])
+    roll  = 0.0
+    for idx, lm in enumerate(lms):
+        if idx in [1, 9, 57, 130, 287, 359]:
+            x, y = lm.x * w, lm.y * h
+            face_coordination_in_image.append([x, y])
+    face_coordination_in_image = np.array(face_coordination_in_image, dtype=np.float64)
 
-            face_coordination_in_image = np.array(face_coordination_in_image,
-                                                  dtype=np.float64)
+    _, rotation_vec, _ = cv2.solvePnP(face_coordination_in_real_world, face_coordination_in_image, ncmtx, None)
+    rotation_matrix, _ = cv2.Rodrigues(rotation_vec)
 
-            # Use solvePnP function to get rotation vector
-            success, rotation_vec, transition_vec = cv2.solvePnP(
-                face_coordination_in_real_world, face_coordination_in_image,
-                ncmtx, None)
+    result = rotation_matrix_to_angles(rotation_matrix)
+    pitch = result[0]
+    yaw   = result[1]
+    roll  = result[2]
 
-            # Use Rodrigues function to convert rotation vector to matrix
-            rotation_matrix, jacobian = cv2.Rodrigues(rotation_vec)
-
-            result = rotation_matrix_to_angles(rotation_matrix)
-            pitch = result[0]
-            yaw   = result[1]
-
-    return pitch, yaw
+    return pitch, yaw, roll
 
 

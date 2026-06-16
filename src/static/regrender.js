@@ -1,4 +1,6 @@
 /**
+ * @class RegionRenderer
+ * @brief renders the region and the moving element
  */
 export class RegionRenderer {
     constructor(config) {
@@ -23,9 +25,7 @@ export class RegionRenderer {
         }
     }
 
-
-    /**
-     */
+    /* This function was debugged with the help of ChatGPT 5.5 */
     draw() {
         if (!this.isDraw)
             return
@@ -48,6 +48,7 @@ export class RegionRenderer {
             this.ball.draw(ctx, this.cfg.region.objcol)
 
             /* Draw timer inside the current region. */
+            /* DISABLED DUE TO IT BEING SHIT */
             /*
             const currTime = Date.now() / 1000
             {
@@ -74,9 +75,7 @@ export class RegionRenderer {
         this.frame = requestAnimationFrame(this.draw.bind(this))
     }
 
-    /**
-     * 
-     */
+
     beginDraw() {
         if (this.isDraw != true) {
             this.isDraw    = true
@@ -86,8 +85,6 @@ export class RegionRenderer {
         }
     }
 
-    /**
-     */
     endDraw() {
         if (this.isDraw != false) {
             cancelAnimationFrame(this.frame)

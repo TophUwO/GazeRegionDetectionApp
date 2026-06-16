@@ -1,3 +1,4 @@
+# Session management.
 from os                 import makedirs, listdir
 from os.path            import isdir, exists
 from random             import choices
@@ -10,16 +11,19 @@ from time               import sleep
 
 @dataclass
 class Pair:
+    """represents a 2-tuple"""
     upper: any = None
     lower: any = None
 
 @dataclass
 class Stage:
+    """represents the per-stage state for a session"""
     id:        int  = -1
     canSupply: bool = False
 
 @dataclass
 class StageStatistics:
+    """collects statistics regarding reasons for dropped data points"""
     nSucc:     int  = 0
     nFNoHead:  int  = 0
     nFEyesCl:  int  = 0
@@ -27,29 +31,35 @@ class StageStatistics:
 
 
 class Client:
+    """represents a session client (device)"""
+
     def __init__(self, session: str, role: str):
         self.sessionCode = session,
         self.roleId      = role
         self.queue       = Queue()
 
     def sendCommand(self, msg) -> None:
+        """adds a command to the client's SSE queue"""
         jsonObj = dumps(msg, separators=[',', ':'])
 
         self.queue.put(jsonObj)
 
 
 class Session:
+    """represents a session state object"""
+
     def __init__(self, man, config, code):
-        self.code       = code
-        self.clients    = Pair(None, None)
-        self.hook       = None
-        self.stage      = Stage(-1, False)
-        self.config     = config
-        self.timer      = None
-        self.lastIdx    = -1
-        self.man        = man
-        self.isFinished = False
-        self.stageStats = [StageStatistics() for i in range(len(self.config['stages']))]
+        self.code       = code             # session code
+        self.clients    = Pair(None, None) # clients
+        self.hook       = None             # optional hook client
+        self.stage      = Stage(-1, False) # current stage
+        self.config     = config           # session config
+        self.timer      = None             # stage timer
+        self.lastIdx    = -1               # last session index
+        self.man        = man              # session manager
+        self.isFinished = False            # whether or not the session is finished
+        
+        self.stageStats = [StageStatistics() for i in range(len(self.config['stages']))] # stats for each stage
 
 
     def gotoNextStage(self) -> bool:
@@ -60,6 +70,7 @@ class Session:
             return False
         
         def int_finalizeStage(delay) -> None:
+            """run when a stage ends"""
             sleep(delay)
 
             print(f'[SESS#{self.code}] Finished stage {self.config["stages"][self.stage.id]["id"]}.')
@@ -76,12 +87,14 @@ class Session:
                 self.endSession()
         
         self.stage = Stage(self.stage.id + 1, True)
-        self.man._timers.submit(int_finalizeStage, stObj['time'])
+        self.man._timers.submit(int_finalizeStage, stObj['time']) # Set the stage timer.
 
         print(f'[SESS#{self.code}] Started stage {stObj.get("id")} ... ending in {stObj.get("time")} seconds.')
         return True
         
     def registerClient(self, role: str) -> None:
+        """registers a client and assigns role"""
+
         if role not in self.config['roleIds']:
             print(f'error: Unknown role \'{role}\'.')
 
@@ -93,12 +106,15 @@ class Session:
             self.clients.lower = Client(self.code, role)
 
     def createHook(self) -> None:
+        """register hook client"""
         self.hook = Client(self.code, '')
 
     def destroyHook(self) -> None:
+        """destroy hook client"""
         self.hook = None
 
     def unregisterClient(self, role: str) -> None:
+        """remove client"""
         if role not in self.config['roleIds']:
             print(f'error: Unknown role \'{role}\'.')
 
@@ -111,6 +127,7 @@ class Session:
 
     
     def getQueue(self, role) -> Queue | None:
+        """get queue for client"""
         cl = self.clients.upper if role == self.config['creatorRole'] else self.clients.lower if role == self.config['joinerRole'] else None
         if cl is not None:
             return cl.queue
@@ -118,6 +135,7 @@ class Session:
         return None
     
     def getHookQueue(self) -> Queue | None:
+        """get hook client queue"""
         if self.hook is None:
             return None
         
@@ -125,6 +143,8 @@ class Session:
     
 
     def sendCommand(self, roleId: str, cmd: str, value: any = None) -> None:
+        """send an SSE command"""
+
         # Format message.
         msg = {
             'command': cmd,
@@ -146,6 +166,8 @@ class Session:
         cl.sendCommand(msg)
 
     def sendCommandToHook(self, cmd: str, value: any = None) -> None:
+        """send an SSE command to hook client"""
+
         if self.hook is None:
             return
         
@@ -157,6 +179,9 @@ class Session:
         self.hook.sendCommand(msg)
 
     def endSession(self) -> None:
+        """ends a session"""
+
+        # Write command to stop SSE stream server-side.
         self.sendCommand('any', 'SysCmd_EndSession')
         self.sendCommandToHook('SysCmd_EndSession')
 
@@ -181,6 +206,8 @@ class Session:
 
 
 class SessionManager:
+    """manages the sessions"""
+
     def __init__(self, config) -> None:
         self.sessionDict = {}
         self._config     = config
@@ -200,6 +227,8 @@ class SessionManager:
 
 
     def createSession(self) -> Session | None:
+        """creates a new session"""
+
         def int_GenSessCode() -> str:
             return ''.join(choices('abcdef0123456789', k=6))
 
@@ -209,7 +238,8 @@ class SessionManager:
 
             return None
 
-        # Create the new session.
+        # Create the new session. Generate new session code until we got a code that does not refer to an already
+        # existing session.
         while True:
             sess = Session(self, self._config, int_GenSessCode())
 

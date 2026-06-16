@@ -1,5 +1,7 @@
 /**
- * @param {*} msg 
+ * worker compressing and sending the images to the server
+ * 
+ * @param {*} msg message containing the raw bitmap from the camera
  */
 self.onmessage = async(msg) => {
     const s = performance.now();
@@ -39,14 +41,10 @@ self.onmessage = async(msg) => {
         },
         body:    form,
     })
-    //const data = await res.json()
-
-    //if (data.type != 'ok')
-    //    console.error(`Could not submit image. Reason: ${data.desc}`)
 
     const e = performance.now();
     const t = e - s;
-    //if (t > 100)
+    if (t > 100)
         console.log(`Making image ${idx} took too long! (${t} ms.)`)
 }
 

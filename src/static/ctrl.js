@@ -12,6 +12,7 @@ import {
 
 
 /**
+ * @brief intermediate stage graph
  */
 const IntermediateViewType = Object.freeze({
     READY:        [IntermediateReadyStage,       'READY',        0, 'CALIBRATION'  ],
@@ -23,10 +24,9 @@ const IntermediateViewType = Object.freeze({
 
 
 /**
+ * @brief central control instance -- does a lot of things.
  */
 export class SessionControl {
-    /**
-     */
     constructor() {
         this.config         = null
         this.imgSubmitter   = null
@@ -49,6 +49,7 @@ export class SessionControl {
 
 
     /**
+     * @brief initializes the user button elements
      */
     initializeInteractiveElements() {
         const crBtn  = document.getElementById('btnCreateSession')
@@ -139,6 +140,7 @@ export class SessionControl {
         })
 
         /**
+         * @ Start a stage if possible.
          */
         cntBtn.addEventListener('click', async() => {
             const nextView = SessionControl.GetNextIntermediateView(this.currIntermView)
@@ -163,7 +165,7 @@ export class SessionControl {
         })
 
         /**
-         * 
+         * @brief Join a session.
          */
         hkBtn.addEventListener('click', async() => {
             let code
@@ -204,6 +206,7 @@ export class SessionControl {
     }
 
     /**
+     * @brief switches to a different HTML div suitable for the current state of the application.
      */
     switchToView(viewId) {
         const newView  = document.getElementById(viewId)
@@ -221,13 +224,17 @@ export class SessionControl {
     }
 
     /**
+     * @brief displays a blank screen.
      */
     switchToIdleView() {
         this.switchToView('viewIdle')
     }
 
     /**
-     * @todo intermViewType must be one of the values of 'IntermediateViewType' directly or else it will not match
+     * switches to an intermediate view
+     * 
+     * @param {*} intermViewType view type to switch to
+     * @returns nothing
      */
     switchToIntermediateView(intermViewType) {
         const [cls, id, n, _] = intermViewType
@@ -286,6 +293,7 @@ export class SessionControl {
     }
 
     /**
+     * @brief shutdown application
      */
     destroy() {
         if (this.imgSubmitter != null) this.imgSubmitter.destroy()
@@ -297,6 +305,7 @@ export class SessionControl {
 
     
     /**
+     * run when a startStage message is received
      * 
      * @param {*} msgObj 
      */
@@ -330,6 +339,7 @@ export class SessionControl {
 
 
     /**
+     * run when a stage is ended
      * 
      * @param {*} msgObj 
      */
@@ -375,6 +385,7 @@ export class SessionControl {
     }
 
     /**
+     * run on the creator when the session is ready
      */
     async onReady() {
         if (this.roleId != this.config.creatorRole)
@@ -394,7 +405,7 @@ export class SessionControl {
     }
 
     /**
-     * 
+     * run when the endSession message is received
      */
     async onEndSession() {
         //this.destroy()
@@ -402,6 +413,7 @@ export class SessionControl {
 
 
     /**
+     * initializes application and session control; also checks for secure context.
      */
     static Create() {
         let config

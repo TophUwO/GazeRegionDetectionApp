@@ -1,3 +1,7 @@
+/**
+ * @class ServerEventSource
+ * @brief one-way pipe from server to client
+ */
 export class ServerEventSource {
     constructor(ctrl, code, role) {
         this.ctrl = ctrl
@@ -46,9 +50,6 @@ export class ServerEventSource {
     }
 
 
-    /**
-     * 
-     */
     close() {
         console.log('Closing SSE connection.')
 
@@ -57,6 +58,10 @@ export class ServerEventSource {
 }
 
 
+/**
+ * @class HookEventSource
+ * @brief one-way pipe from server to observer
+ */
 export class HookEventSource {
     constructor(ctrl, code) {
         this.ctrl = ctrl
@@ -133,9 +138,6 @@ export class HookEventSource {
     }
     
 
-    /**
-     * 
-     */
     close() {
         console.log('Closing SSE connection.')
 

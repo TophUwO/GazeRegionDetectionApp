@@ -1,4 +1,6 @@
 /**
+ * @class ImageSubmitter
+ * @brief does the image submitting
  */
 export class ImageSubmitter {
     /**

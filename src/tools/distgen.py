@@ -1,10 +1,12 @@
+# Make head pose distribution plot.
 import matplotlib.pyplot as plt
 import datetime          as dt
 
 from sys                import argv
-from estimator          import EstimatePitchYaw
+from estimator          import EstimatePitchYawRoll
 from os                 import walk
 from numpy              import load
+from re                 import match
 
 
 if __name__ == '__main__':
@@ -18,6 +20,7 @@ if __name__ == '__main__':
 
                 i += 1
 
+
     print(f'Collected {len(img2Proc)} files. Processing ...')
 
     # Get camera calibration results.
@@ -30,7 +33,7 @@ if __name__ == '__main__':
     x = []
     y = []
     for j, f in zip([j for j in range(i)], img2Proc):
-        pitch, yaw = EstimatePitchYaw(f, cmtx, ncmtx, dist, roi)
+        pitch, yaw, _ = EstimatePitchYawRoll(f, cmtx, ncmtx, dist, roi)
 
         x.append(yaw)
         y.append(pitch)
@@ -39,11 +42,12 @@ if __name__ == '__main__':
     # Generate 2D histogram.
     print('Generating histogram.')
     plt.hist2d(x, y, bins=50, cmap='viridis')
+    plt.grid(True, color='white', linestyle='--', linewidth=0.5, alpha=0.5)
 
     plt.xlabel('Yaw [deg]')
     plt.ylabel('Pitch [deg]')
     plt.colorbar(label='Count')
-    plt.savefig(f'GazeReg_HeadPoseDist_{dt.datetime.now().strftime("%Y-%m-%d")}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'GazeReg_HeadPoseDist_{dt.datetime.now().strftime("%Y-%m-%d")}.pdf', dpi=300, bbox_inches='tight')
 
 
     

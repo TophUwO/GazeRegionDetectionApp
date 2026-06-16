@@ -1,9 +1,11 @@
+# Download facemesh model if mot present.
 from os.path        import exists
 from os             import makedirs
 from urllib.request import urlretrieve
 from urllib.error   import URLError, HTTPError
 
 
+## downloads the face landmarker model if it cannot be found
 def DownloadFaceLandmarkerModelBundle() -> bool:
     print('info: Checking for \'face_landmarker.task\' ... ', end='')
 

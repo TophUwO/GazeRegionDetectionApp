@@ -1,3 +1,4 @@
+# Camera calibration.
 # The code in this file is based on https://docs.opencv.org/3.4/dc/dbb/tutorial_py_calibration.html.
 import cv2
 import numpy as np
@@ -65,7 +66,7 @@ def CalibrateCamera(imgdir, dbg) -> int:
     # (5) Calculate camera and distortion matrices.
     _, mtx, dist, rv, tv = cv2.calibrateCamera(objPts, imgPts, workIm.shape[::-1], None, None)
     # Calibration done. Refine the camera matrix based on the image size. Since our image size is always
-    # 1920x1080, it is always the same. Hence, we can precompute it here.
+    # 1920x1080, we can precompute it here.
     ncmtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, IMDIM, 1, IMDIM)
 
     # Save the parameters.
@@ -78,7 +79,7 @@ def CalibrateCamera(imgdir, dbg) -> int:
 
     print('Calibration successful. Saved matrices.')
 
-    # Calculate re-projection error.
+    # Calculate re-projection error. This is solely to check how good our estimated camera parameters are.
     mean_error = 0
     for i in range(len(objPts)):
         imgpoints2, _ = cv2.projectPoints(objPts[i], rv[i], tv[i], mtx, dist)

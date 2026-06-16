@@ -2,7 +2,8 @@ import { IntermediateStage } from "./interm.js"
 
 
 /**
- * 
+ * @class IntermediateCalibrationStage
+ * @brief represents the calibration stage
  */
 export class IntermediateCalibrationStage extends IntermediateStage {
     isInCalib   = false
@@ -18,6 +19,7 @@ export class IntermediateCalibrationStage extends IntermediateStage {
                   'you are in a bright room with relatively soft lighting. Avoid bright light sources behind you.'
 
     /**
+     * @brief initialize
      */
     startIntermediateStage(srcVideo) {
         this.srcVideo  = srcVideo
@@ -35,7 +37,7 @@ export class IntermediateCalibrationStage extends IntermediateStage {
     }
 
     /**
-     * 
+     * @brief cleanup
      */
     endIntermediateStage() {
         this.isInCalib = false
@@ -51,7 +53,7 @@ export class IntermediateCalibrationStage extends IntermediateStage {
     }
 
     /**
-     * 
+     * @brief draw camera frame
      */
     showCalibration() {
         if (!this.isInCalib)

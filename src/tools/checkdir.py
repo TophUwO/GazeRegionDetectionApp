@@ -1,3 +1,4 @@
+# Check raw dirs for irregularities.
 from sys import argv
 from os  import listdir, path
 
@@ -8,5 +9,7 @@ if __name__ == '__main__':
     for file in listdir(dir):
         if file.endswith('.jpg') and not path.exists(dir + file.replace('img', 'lbl').replace('.jpg', '.json')):
             print(f'error: Image "{file}" has no corresponding label.')
+
+    exit(0)
 
 
