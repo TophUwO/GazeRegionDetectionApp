@@ -1,7 +1,6 @@
 /.venv
 /.vscode
 /__pycache__
-/models
 /files
 /py311
 *.pyc
